@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+*.exe
+*.db
+*.db-shm
+*.db-wal
+server/server
+.env
+.idea/
+# Local SQLite data dir (main DB + per-tenant files)
+data/
+# Google service account private keys (never commit)
+stoked-elixir-504705-f1-*.json
+leafy-analyst-504705-u2-*.json

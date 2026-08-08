@@ -1,0 +1,78 @@
+# ============================================================
+# go-drive — Docker Compose (production / VPS deploy)
+#
+# Usage:
+#   1. cp .env.example .env   lalu isi AUTHULA_SECRET
+#   2. docker compose up -d --build
+#
+# Postgres DIBUAT di compose ini (self-contained). Data persisten
+# di named volume `pgdata`. Backup: pg_dump dari container db,
+# contoh: docker compose exec postgres pg_dump -U manajemen_tiket \
+#         manajemen_tiket > backup.sql
+#
+# GDrive credentials di-set dari Admin Settings (UI), tersimpan
+# di DB (app_settings) — tidak perlu env tambahan.
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: go-drive-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-manajemen_tiket}
+      POSTGRES_USER: ${POSTGRES_USER:-manajemen_tiket}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-manajemen_tiket}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    image: go-drive:latest
+    container_name: go-drive-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8081}:8081"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "8081"
+      # Koneksi ke Postgres di compose ini (service name = hostname)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-manajemen_tiket}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-manajemen_tiket}?sslmode=disable
+      # Pastikan waktu file bukti pembayaran & tanggal tampil benar
+      TZ: Asia/Jakarta
+      # Strict CSP untuk production (off di dev karena Vite HMR)
+      CSP_ENABLED: "1"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    # godotenv.Load() di main.go membaca file ini jika env var belum diset
+    volumes:
+      - ./server/.env:/app/.env:ro
+
+  # Cloudflare tunnel — satu container dengan app, akses lewat http://app:8081
+  # di network docker yang sama. Konfigurasi + credentials JSON ada di ./cloudflared.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: go-drive-tunnel
+    restart: unless-stopped
+    depends_on:
+      - app
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    command: tunnel --config /etc/cloudflared/config.yml run
+
+volumes:
+  pgdata:

@@ -1,0 +1,617 @@
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import { tenantApi } from '@/lib/api'
+import type { ReplicationRun, S3Key, Store } from '@/lib/types'
+import { useOrgStore } from '@/store/org'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Check, Database, KeyRound, Loader2, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
+
+function copyText(text: string) {
+  void navigator.clipboard.writeText(text)
+}
+
+interface StoresData {
+  stores: Store[]
+  primaryStoreId: string | null
+}
+
+interface TestStoreData {
+  ok: boolean
+  used: number
+  limit: number
+}
+
+interface IngestData {
+  ingested: number
+}
+
+interface SyncData {
+  runs: ReplicationRun[]
+}
+
+interface TriggerSyncData {
+  run: ReplicationRun
+}
+
+interface KeysData {
+  keys: S3Key[]
+}
+
+interface CreateKeyData {
+  key: S3Key
+  accessKeyId: string
+  secretAccessKey: string
+}
+
+type Provider = 'local' | 's3' | 'gdrive'
+
+interface StoreForm {
+  name: string
+  provider: Provider
+  writeMode: string
+  ingestMode: string
+  readPriority: number
+  config: Record<string, string>
+  credentials: Record<string, string>
+}
+
+function useOrgSlug(): string | undefined {
+  return useOrgStore((s) => s.currentOrg?.slug)
+}
+
+export default function StoresPage() {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const orgSlug = useOrgSlug()
+
+  const [createOpen, setCreateOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Store | null>(null)
+  const [keyCreatedData, setKeyCreatedData] = useState<CreateKeyData | null>(null)
+  const [deleteKeyTarget, setDeleteKeyTarget] = useState<S3Key | null>(null)
+  const [createKeyOpen, setCreateKeyOpen] = useState(false)
+  const [testResult, setTestResult] = useState<{ id: string; text: string } | null>(null)
+
+  // Create store form state
+  const [form, setForm] = useState<StoreForm>({
+    name: '',
+    provider: 'local',
+    writeMode: 'write',
+    ingestMode: 'none',
+    readPriority: 100,
+    config: {},
+    credentials: {},
+  })
+
+  // S3 key form state
+  const [keyName, setKeyName] = useState('')
+  const [keyPermissions, setKeyPermissions] = useState('readwrite')
+
+  const storesQuery = useQuery({
+    queryKey: ['t', 'stores', orgSlug],
+    queryFn: () => tenantApi<StoresData>('/api/t/stores', orgSlug!),
+    enabled: !!orgSlug,
+  })
+
+  const syncQuery = useQuery({
+    queryKey: ['t', 'stores', 'sync', orgSlug],
+    queryFn: () => tenantApi<SyncData>('/api/t/stores/sync', orgSlug!),
+    enabled: !!orgSlug,
+  })
+
+  const keysQuery = useQuery({
+    queryKey: ['t', 's3keys', orgSlug],
+    queryFn: () => tenantApi<KeysData>('/api/t/s3-keys', orgSlug!),
+    enabled: !!orgSlug,
+  })
+
+  const invalidateStores = () => {
+    queryClient.invalidateQueries({ queryKey: ['t', 'stores', orgSlug] })
+    queryClient.invalidateQueries({ queryKey: ['t', 'stores', 'sync', orgSlug] })
+  }
+
+  const createStore = useMutation({
+    mutationFn: (f: StoreForm) =>
+      tenantApi<{ store: Store }>('/api/t/stores', orgSlug!, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: f.name,
+          provider: f.provider,
+          writeMode: f.writeMode,
+          ingestMode: f.ingestMode,
+          readPriority: f.readPriority,
+          config: f.config,
+          credentials: f.credentials,
+        }),
+      }),
+    onSuccess: () => {
+      invalidateStores()
+      setCreateOpen(false)
+      setForm({ name: '', provider: 'local', writeMode: 'write', ingestMode: 'none', readPriority: 100, config: {}, credentials: {} })
+    },
+  })
+
+  const deleteStore = useMutation({
+    mutationFn: (id: string) => tenantApi<unknown>(`/api/t/stores/${id}`, orgSlug!, { method: 'DELETE' }),
+    onSuccess: () => {
+      invalidateStores()
+      setDeleteTarget(null)
+    },
+  })
+
+  const testStore = useMutation({
+    mutationFn: (id: string) => tenantApi<TestStoreData>(`/api/t/stores/${id}/test`, orgSlug!, { method: 'POST' }),
+    onSuccess: (data, id) => {
+      setTestResult({
+        id,
+        text: t('stores.testResult', { used: data.used, limit: data.limit }),
+      })
+    },
+    onError: () => {
+      setTestResult({ id: '', text: t('stores.testFailed') })
+    },
+  })
+
+  const setPrimary = useMutation({
+    mutationFn: (id: string) => tenantApi<unknown>(`/api/t/stores/${id}/primary`, orgSlug!, { method: 'POST' }),
+    onSuccess: invalidateStores,
+  })
+
+  const triggerIngest = useMutation({
+    mutationFn: (id: string) => tenantApi<IngestData>(`/api/t/stores/${id}/ingest`, orgSlug!, { method: 'POST' }),
+    onSuccess: invalidateStores,
+  })
+
+  const triggerSync = useMutation({
+    mutationFn: () => tenantApi<TriggerSyncData>('/api/t/stores/sync', orgSlug!, { method: 'POST' }),
+    onSuccess: invalidateStores,
+  })
+
+  const createKey = useMutation({
+    mutationFn: () =>
+      tenantApi<CreateKeyData>('/api/t/s3-keys', orgSlug!, {
+        method: 'POST',
+        body: JSON.stringify({ name: keyName, permissions: keyPermissions }),
+      }),
+    onSuccess: (data) => {
+      setKeyCreatedData(data)
+      setKeyName('')
+      setKeyPermissions('readwrite')
+      queryClient.invalidateQueries({ queryKey: ['t', 's3keys', orgSlug] })
+    },
+  })
+
+  const deleteKey = useMutation({
+    mutationFn: (id: string) => tenantApi<unknown>(`/api/t/s3-keys/${id}`, orgSlug!, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['t', 's3keys', orgSlug] })
+      setDeleteKeyTarget(null)
+    },
+  })
+
+  const stores = storesQuery.data?.stores ?? []
+  const primaryStoreId = storesQuery.data?.primaryStoreId ?? null
+  const runs = syncQuery.data?.runs ?? []
+  const keys = keysQuery.data?.keys ?? []
+
+  const setConfigField = (key: string, value: string) => {
+    setForm((f) => ({ ...f, config: { ...f.config, [key]: value } }))
+  }
+
+  const setCredentialField = (key: string, value: string) => {
+    setForm((f) => ({ ...f, credentials: { ...f.credentials, [key]: value } }))
+  }
+
+  const providerLabel = (p: string) => {
+    if (p === 'local') return t('stores.providerLocal')
+    if (p === 's3') return t('stores.providerS3')
+    if (p === 'gdrive') return t('stores.providerGdrive')
+    return p
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{t('stores.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('stores.description')}</p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          {t('stores.attachStore')}
+        </Button>
+      </div>
+
+      {storesQuery.isPending && <p className="text-sm text-muted-foreground">...</p>}
+      {storesQuery.isError && <p className="text-sm text-destructive">{t('stores.loadError')}</p>}
+
+      {stores.length === 0 && !storesQuery.isPending && (
+        <Card>
+          <CardContent className="py-10 text-center">
+            <p className="text-sm text-muted-foreground">{t('stores.noStores')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('stores.noStoresHint')}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {stores.map((store) => (
+          <Card key={store.id}>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Database className="h-4 w-4 text-muted-foreground" />
+                <span className="truncate">{store.name}</span>
+                {store.id === primaryStoreId && (
+                  <Badge className="gap-1">
+                    <Star className="h-3 w-3" />
+                    {t('stores.primary')}
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                <Badge variant="secondary">{providerLabel(store.provider)}</Badge>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <dl className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <dt className="text-muted-foreground">{t('stores.status')}</dt>
+                  <dd className="capitalize">{store.status}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{t('stores.writeMode')}</dt>
+                  <dd>{store.write_mode}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{t('stores.ingestMode')}</dt>
+                  <dd>{store.ingest_mode}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{t('stores.readPriority')}</dt>
+                  <dd>{store.read_priority}</dd>
+                </div>
+              </dl>
+
+              {testResult?.id === store.id && (
+                <p className="text-xs text-muted-foreground">{testResult.text}</p>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {store.id !== primaryStoreId && (
+                  <Button variant="outline" size="sm" disabled={setPrimary.isPending} onClick={() => setPrimary.mutate(store.id)}>
+                    <Star className="h-3 w-3 mr-1" />
+                    {t('stores.setPrimary')}
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" disabled={testStore.isPending} onClick={() => testStore.mutate(store.id)}>
+                  {testStore.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
+                  {t('stores.testConnection')}
+                </Button>
+                <Button variant="outline" size="sm" disabled={triggerIngest.isPending} onClick={() => triggerIngest.mutate(store.id)}>
+                  {t('stores.triggerIngest')}
+                </Button>
+                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleteTarget(store)}>
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  {t('stores.deleteStore')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <RefreshCw className="h-4 w-4" />
+            {t('stores.syncTitle')}
+          </CardTitle>
+          <CardDescription>
+            <Button variant="outline" size="sm" disabled={triggerSync.isPending} onClick={() => triggerSync.mutate()}>
+              {t('stores.triggerSync')}
+            </Button>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {runs.length === 0 && <p className="text-muted-foreground">{t('stores.noRuns')}</p>}
+          {runs.map((run) => (
+            <div key={run.id} className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium capitalize">{run.kind}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('stores.runItems', { processed: run.processed_items, total: run.total_items })}
+                  {run.failed_items > 0 && ` · ${t('stores.runFailed', { failed: run.failed_items })}`}
+                </p>
+              </div>
+              <Badge variant={run.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
+                {run.status}
+              </Badge>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <KeyRound className="h-4 w-4" />
+            {t('stores.s3Keys')}
+          </CardTitle>
+          <CardDescription>
+            <Button variant="outline" size="sm" onClick={() => setCreateKeyOpen(true)}>
+              {t('stores.createKey')}
+            </Button>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {keys.length === 0 && <p className="text-muted-foreground">{t('stores.noKeys')}</p>}
+          {keys.map((key) => (
+            <div key={key.id} className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">{key.name}</p>
+                <p className="font-mono text-xs text-muted-foreground">{key.access_key_id}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{key.permissions}</Badge>
+                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleteKeyTarget(key)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Attach store dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('stores.createStore')}</DialogTitle>
+            <DialogDescription>
+              {t('stores.description')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="store-name">{t('stores.name')}</Label>
+                <Input id="store-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="store-provider">{t('stores.provider')}</Label>
+                <Select value={form.provider} onValueChange={(v) => setForm({ ...form, provider: v as Provider })}>
+                  <SelectTrigger id="store-provider">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="local">{t('stores.providerLocal')}</SelectItem>
+                    <SelectItem value="s3">{t('stores.providerS3')}</SelectItem>
+                    <SelectItem value="gdrive">{t('stores.providerGdrive')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t('stores.configSection')}</Label>
+              {form.provider === 'local' && (
+                <>
+                  <Input placeholder={t('stores.baseDir')} onChange={(e) => setConfigField('baseDir', e.target.value)} />
+                  <Input placeholder={t('stores.publicUrl')} onChange={(e) => setConfigField('publicUrl', e.target.value)} />
+                </>
+              )}
+              {form.provider === 's3' && (
+                <>
+                  <Input placeholder={t('stores.bucket')} onChange={(e) => setConfigField('bucket', e.target.value)} />
+                  <Input placeholder={t('stores.region')} onChange={(e) => setConfigField('region', e.target.value)} />
+                  <Input placeholder={t('stores.endpoint')} onChange={(e) => setConfigField('endpoint', e.target.value)} />
+                </>
+              )}
+              {form.provider === 'gdrive' && (
+                <Input placeholder={t('stores.folderId')} onChange={(e) => setConfigField('folderId', e.target.value)} />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t('stores.credentialsSection')}</Label>
+              {form.provider === 's3' && (
+                <>
+                  <Input placeholder={t('stores.accessKeyId')} onChange={(e) => setCredentialField('accessKeyId', e.target.value)} />
+                  <Input type="password" placeholder={t('stores.secretAccessKey')} onChange={(e) => setCredentialField('secretAccessKey', e.target.value)} />
+                </>
+              )}
+              {form.provider === 'gdrive' && (
+                <>
+                  <Input placeholder={t('stores.clientId')} onChange={(e) => setCredentialField('clientId', e.target.value)} />
+                  <Input type="password" placeholder={t('stores.clientSecret')} onChange={(e) => setCredentialField('clientSecret', e.target.value)} />
+                  <Input type="password" placeholder={t('stores.refreshToken')} onChange={(e) => setCredentialField('refreshToken', e.target.value)} />
+                </>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t('stores.writeMode')}</Label>
+              <Select value={form.writeMode} onValueChange={(v) => setForm({ ...form, writeMode: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="write">write</SelectItem>
+                  <SelectItem value="writeonly">writeonly</SelectItem>
+                  <SelectItem value="none">none</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t('stores.ingestMode')}</Label>
+              <Select value={form.ingestMode} onValueChange={(v) => setForm({ ...form, ingestMode: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">none</SelectItem>
+                  <SelectItem value="poll">poll</SelectItem>
+                  <SelectItem value="webhook">webhook</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="store-priority">{t('stores.readPriority')}</Label>
+              <Input
+                id="store-priority"
+                type="number"
+                value={form.readPriority}
+                onChange={(e) => setForm({ ...form, readPriority: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              {t('links.cancel')}
+            </Button>
+            <Button disabled={!form.name || createStore.isPending} onClick={() => createStore.mutate(form)}>
+              {t('stores.createStore')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete store confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('stores.deleteStore')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget ? t('stores.deleteStoreConfirm', { name: deleteTarget.name }) : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>{t('links.cancel')}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={deleteStore.isPending} onClick={() => deleteTarget && deleteStore.mutate(deleteTarget.id)}>
+              {t('stores.deleteStore')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create S3 API key dialog */}
+      <Dialog open={createKeyOpen} onOpenChange={setCreateKeyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('stores.createKeyTitle')}</DialogTitle>
+            <DialogDescription>{t('stores.permissions')}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="key-name">{t('stores.keyName')}</Label>
+              <Input
+                id="key-name"
+                value={keyName}
+                onChange={(e) => setKeyName(e.target.value)}
+                placeholder={t('stores.keyName')}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="key-permissions">{t('stores.permissions')}</Label>
+              <Select value={keyPermissions} onValueChange={setKeyPermissions}>
+                <SelectTrigger id="key-permissions">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="readwrite">{t('stores.permissionReadwrite')}</SelectItem>
+                  <SelectItem value="readonly">{t('stores.permissionReadonly')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateKeyOpen(false)}>
+              {t('links.cancel')}
+            </Button>
+            <Button
+              disabled={!keyName.trim() || createKey.isPending}
+              onClick={() => createKey.mutate()}
+            >
+              {createKey.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {t('stores.createKey')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* S3 key created dialog */}
+      <Dialog open={!!keyCreatedData} onOpenChange={(o) => !o && setKeyCreatedData(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('stores.keyCreated')}</DialogTitle>
+            <DialogDescription>{t('stores.keyCreatedOnce')}</DialogDescription>
+          </DialogHeader>
+          {keyCreatedData && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>{t('stores.accessKeyId')}</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={keyCreatedData.accessKeyId} />
+                  <Button variant="outline" onClick={() => copyText(keyCreatedData.accessKeyId)}>
+                    {t('stores.copyAccessKey')}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{t('stores.secretAccessKey')}</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={keyCreatedData.secretAccessKey} />
+                  <Button variant="outline" onClick={() => copyText(keyCreatedData.secretAccessKey)}>
+                    {t('stores.copySecret')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setKeyCreatedData(null)}>{t('links.save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete key confirm */}
+      <AlertDialog open={!!deleteKeyTarget} onOpenChange={(o) => !o && setDeleteKeyTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('stores.deleteKey')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteKeyTarget ? t('stores.deleteKeyConfirm', { name: deleteKeyTarget.name }) : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteKeyTarget(null)}>{t('links.cancel')}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={deleteKey.isPending} onClick={() => deleteKeyTarget && deleteKey.mutate(deleteKeyTarget.id)}>
+              {t('stores.deleteKey')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}

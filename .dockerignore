@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.json
+!package.json
+!web/package-lock.json
+!server/go.mod
+!server/go.sum
+
+# Node / build artifacts
+**/node_modules
+**/dist
+**/.vite
+
+# Go build artifacts
+**/bin
+dist/
+
+# Local tooling & docs
+docs/
+CLAUDE.md
+notes.md
+README.md
+LICENSE
+Makefile
+.superpowers
+
+# Service account key — NEVER ship to image
+leafy-analyst-504705-u2-8eabaa2c14cb.json
+
+# OS junk
+.DS_Store
+Thumbs.db

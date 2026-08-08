@@ -1,0 +1,15 @@
+{
+  "name": "go-drive",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "concurrently --kill-others -n server,web -c yellow,cyan \"cd server && go run ./cmd/server\" \"cd web && npm run dev\"",
+    "dev:server": "cd server && go run ./cmd/server",
+    "dev:web": "cd web && npm run dev",
+    "install:all": "cd server && go mod download && cd ../web && npm install",
+    "build": "cd web && npm run build && cd ../server && go build -o ../dist/server ./cmd/server"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.4"
+  }
+}
