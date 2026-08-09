@@ -21,6 +21,8 @@ type Store struct {
 	IngestMode       string         `json:"ingest_mode" bun:"ingest_mode,notnull,default:'none'"`
 	ReadPriority     int            `json:"read_priority" bun:"read_priority,notnull,default:100"`
 	Config           map[string]any `json:"config" bun:"config,type:jsonb,notnull"`
+	QuotaUsed        int64          `json:"quota_used" bun:"quota_used,notnull,default:0"`
+	QuotaLimit       int64          `json:"quota_limit" bun:"quota_limit,notnull,default:0"`
 	LastTestedAt     *time.Time     `json:"last_tested_at" bun:"last_tested_at"`
 	LastSyncedAt     *time.Time     `json:"last_synced_at" bun:"last_synced_at"`
 	CreatedAt        time.Time      `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`

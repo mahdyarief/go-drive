@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router'
 import { tenantApi } from '@/lib/api'
 import type { ReplicationRun, S3Key, Store } from '@/lib/types'
 import { useOrgStore } from '@/store/org'
@@ -10,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -27,6 +29,10 @@ import { Check, Database, KeyRound, Loader2, Plus, RefreshCw, Star, Trash2 } fro
 function copyText(text: string) {
   void navigator.clipboard.writeText(text)
 }
+
+// localStorage key used to notify other tabs when a Google Drive connect
+// completes in the OAuth tab (the `storage` event fires in every other tab).
+const GDRIVE_CONNECTED_KEY = 'gdrive:connected'
 
 interface StoresData {
   stores: Store[]
@@ -73,6 +79,13 @@ interface StoreForm {
   credentials: Record<string, string>
 }
 
+interface GDriveCompleteData {
+  ok: boolean
+  used: number
+  limit: number
+  storeId: string
+}
+
 function useOrgSlug(): string | undefined {
   return useOrgStore((s) => s.currentOrg?.slug)
 }
@@ -87,7 +100,7 @@ export default function StoresPage() {
   const [keyCreatedData, setKeyCreatedData] = useState<CreateKeyData | null>(null)
   const [deleteKeyTarget, setDeleteKeyTarget] = useState<S3Key | null>(null)
   const [createKeyOpen, setCreateKeyOpen] = useState(false)
-  const [testResult, setTestResult] = useState<{ id: string; text: string } | null>(null)
+  const [testResult, setTestResult] = useState<{ id: string; text: string; used?: number; limit?: number } | null>(null)
 
   // Create store form state
   const [form, setForm] = useState<StoreForm>({
@@ -99,6 +112,98 @@ export default function StoresPage() {
     config: {},
     credentials: {},
   })
+
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [gdriveError, setGdriveError] = useState(false)
+
+  // Handle the return from the Google consent screen: ?gdrive=connected&state=...
+  useEffect(() => {
+    const gdrive = searchParams.get('gdrive')
+    if (!gdrive || !orgSlug) return
+    const state = searchParams.get('state') ?? ''
+    setSearchParams({}, { replace: true })
+    if (gdrive === 'error') {
+      setGdriveError(true)
+      return
+    }
+    if (gdrive !== 'connected') return
+    tenantApi<GDriveCompleteData>(
+      `/api/t/stores/gdrive/complete?state=${encodeURIComponent(state)}`,
+      orgSlug,
+    )
+      .then((data) => {
+        setGdriveError(false)
+        // Notify other open tabs (the one that started the flow) so their
+        // store list refreshes and shows the Connected badge.
+        localStorage.setItem(
+          GDRIVE_CONNECTED_KEY,
+          JSON.stringify({ storeId: data.storeId, used: data.used, limit: data.limit }),
+        )
+        queryClient.invalidateQueries({ queryKey: ['t', 'stores', orgSlug] })
+        queryClient.invalidateQueries({ queryKey: ['t', 'stores', 'sync', orgSlug] })
+        setTestResult({
+          id: data.storeId,
+          used: data.used,
+          limit: data.limit,
+          text: t('stores.testResult', { used: data.used, limit: data.limit }),
+        })
+      })
+      .catch(() => {
+        setGdriveError(true)
+      })
+  }, [searchParams, setSearchParams, orgSlug, queryClient, t])
+
+  // A connect that finishes in the OAuth tab writes to localStorage; the
+  // storage event fires here (other tabs) so this tab refreshes too.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== GDRIVE_CONNECTED_KEY || !e.newValue || !orgSlug) return
+      queryClient.invalidateQueries({ queryKey: ['t', 'stores', orgSlug] })
+      queryClient.invalidateQueries({ queryKey: ['t', 'stores', 'sync', orgSlug] })
+      try {
+        const data = JSON.parse(e.newValue) as { storeId: string; used: number; limit: number }
+        setTestResult({
+          id: data.storeId,
+          used: data.used,
+          limit: data.limit,
+          text: t('stores.testResult', { used: data.used, limit: data.limit }),
+        })
+      } catch {
+        // ignore malformed payloads from other tabs
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [queryClient, orgSlug, t])
+
+  const gdriveAuth = useMutation({
+    mutationFn: (id: string) =>
+      tenantApi<{ auth_url: string }>(`/api/t/stores/${id}/gdrive/auth-url`, orgSlug!, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+    onMutate: () => setGdriveError(false),
+  })
+
+  const handleGdriveConnect = (storeId: string) => {
+    setGdriveError(false)
+    // Open a blank tab synchronously (inside the click gesture) so popup
+    // blockers don't block it; navigate it once the auth URL arrives.
+    const popup = window.open('', '_blank')
+    gdriveAuth.mutate(storeId, {
+      onSuccess: (data) => {
+        if (popup && !popup.closed) {
+          popup.location.href = data.auth_url
+        } else {
+          window.location.href = data.auth_url
+        }
+      },
+      onError: () => {
+        popup?.close()
+        setGdriveError(true)
+      },
+    })
+  }
 
   // S3 key form state
   const [keyName, setKeyName] = useState('')
@@ -161,6 +266,8 @@ export default function StoresPage() {
     onSuccess: (data, id) => {
       setTestResult({
         id,
+        used: data.used,
+        limit: data.limit,
         text: t('stores.testResult', { used: data.used, limit: data.limit }),
       })
     },
@@ -241,6 +348,11 @@ export default function StoresPage() {
 
       {storesQuery.isPending && <p className="text-sm text-muted-foreground">...</p>}
       {storesQuery.isError && <p className="text-sm text-destructive">{t('stores.loadError')}</p>}
+      {gdriveError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {t('stores.gdriveConnectError')}
+        </div>
+      )}
 
       {stores.length === 0 && !storesQuery.isPending && (
         <Card>
@@ -258,6 +370,22 @@ export default function StoresPage() {
               <CardTitle className="flex items-center gap-2 text-base">
                 <Database className="h-4 w-4 text-muted-foreground" />
                 <span className="truncate">{store.name}</span>
+                {store.provider === 'gdrive' && store.status === 'active' && (
+                  <Badge variant="outline" className="gap-1 border-emerald-600/30 bg-emerald-600/10 text-emerald-700">
+                    <Check className="h-3 w-3" />
+                    {t('stores.connected')}
+                  </Badge>
+                )}
+                {store.provider === 'gdrive' && store.status === 'pending' && (
+                  <Badge variant="outline" className="gap-1 border-amber-500/30 bg-amber-500/10 text-amber-700">
+                    {t('stores.pending')}
+                  </Badge>
+                )}
+                {store.provider === 'gdrive' && store.status === 'error' && (
+                  <Badge variant="destructive" className="gap-1">
+                    {t('stores.error')}
+                  </Badge>
+                )}
                 {store.id === primaryStoreId && (
                   <Badge className="gap-1">
                     <Star className="h-3 w-3" />
@@ -289,11 +417,23 @@ export default function StoresPage() {
                 </div>
               </dl>
 
+              {store.provider === 'gdrive' && store.status === 'active' && (
+                <Progress
+                  value={store.quota_limit > 0 ? Math.min(100, (store.quota_used / store.quota_limit) * 100) : 0}
+                  className="h-2"
+                />
+              )}
               {testResult?.id === store.id && (
                 <p className="text-xs text-muted-foreground">{testResult.text}</p>
               )}
 
               <div className="flex flex-wrap gap-2">
+                {store.provider === 'gdrive' && store.status !== 'active' && (
+                  <Button variant="outline" size="sm" disabled={gdriveAuth.isPending} onClick={() => handleGdriveConnect(store.id)}>
+                    {gdriveAuth.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                    {t('stores.connectGoogle')}
+                  </Button>
+                )}
                 {store.id !== primaryStoreId && (
                   <Button variant="outline" size="sm" disabled={setPrimary.isPending} onClick={() => setPrimary.mutate(store.id)}>
                     <Star className="h-3 w-3 mr-1" />
@@ -443,7 +583,6 @@ export default function StoresPage() {
                 <>
                   <Input placeholder={t('stores.clientId')} onChange={(e) => setCredentialField('clientId', e.target.value)} />
                   <Input type="password" placeholder={t('stores.clientSecret')} onChange={(e) => setCredentialField('clientSecret', e.target.value)} />
-                  <Input type="password" placeholder={t('stores.refreshToken')} onChange={(e) => setCredentialField('refreshToken', e.target.value)} />
                 </>
               )}
             </div>

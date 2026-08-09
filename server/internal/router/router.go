@@ -39,6 +39,9 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 	r.GET("/api/tracked/:token/download", handler.PublicTrackedDownload(db))
 	r.GET("/api/tracked/:token/raw", handler.PublicTrackedRaw(db))
 
+	// Per-tenant Google Drive OAuth callback (PUBLIC — Google redirects the browser here)
+	r.GET("/api/gdrive/store-callback", handler.GDriveStoreCallback())
+
 	// Authenticated API routes (Bearer session token)
 	authed := r.Group("/api", middleware.Auth(db))
 	{
@@ -73,6 +76,9 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		tenant.POST("/stores/:id/ingest", handler.TriggerIngest(db))
 		tenant.GET("/stores/sync", handler.SyncStatus(db))
 		tenant.POST("/stores/sync", handler.TriggerSync(db))
+		// Per-tenant Google Drive OAuth consent flow (Attach Store → connect from store card)
+		tenant.POST("/stores/:id/gdrive/auth-url", handler.GDriveStoreAuthURL(db))
+		tenant.GET("/stores/gdrive/complete", handler.GDriveStoreComplete(db))
 
 		// File explorer (M5)
 		tenant.GET("/files", handler.ListFiles(db))

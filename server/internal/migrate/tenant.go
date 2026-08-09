@@ -26,6 +26,35 @@ func isSQLite(db bun.IDB) bool {
 	return db.Dialect().Name() == dialect.SQLite
 }
 
+// sqliteEnsureColumn adds a column to an existing SQLite table when it is
+// missing. SQLite has no ADD COLUMN IF NOT EXISTS, so existence is checked via
+// PRAGMA table_info first.
+func sqliteEnsureColumn(ctx context.Context, db bun.IDB, table, column, ddl string) error {
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var dflt any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", table, ddl))
+	return err
+}
+
 // CreateTenantSchema creates the tenant schema for the given org slug.
 // Postgres: creates a `tenant_<slug>` schema. SQLite has no schemas, so
 // tenant tables (if any) are created in the shared database file instead.
@@ -73,6 +102,8 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			ingest_mode text NOT NULL DEFAULT 'none',
 			read_priority integer NOT NULL DEFAULT 100,
 			config jsonb NOT NULL DEFAULT '',
+			quota_used bigint NOT NULL DEFAULT 0,
+			quota_limit bigint NOT NULL DEFAULT 0,
 			last_tested_at timestamptz,
 			last_synced_at timestamptz,
 			created_at timestamptz NOT NULL DEFAULT now(),
@@ -346,6 +377,23 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			updated_at timestamptz NOT NULL DEFAULT now(),
 			UNIQUE (file_id, plugin_slug)
 		)`),
+	}
+
+	// Additive alterations for schemas created before these columns existed.
+	// Postgres supports ADD COLUMN IF NOT EXISTS; SQLite lacks that syntax, so
+	// each column is added only when PRAGMA table_info shows it is missing.
+	if isSQLite(db) {
+		if err := sqliteEnsureColumn(ctx, db, "stores", "quota_used", "quota_used bigint NOT NULL DEFAULT 0"); err != nil {
+			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
+		}
+		if err := sqliteEnsureColumn(ctx, db, "stores", "quota_limit", "quota_limit bigint NOT NULL DEFAULT 0"); err != nil {
+			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
+		}
+	} else {
+		queries = append(queries,
+			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS quota_used bigint NOT NULL DEFAULT 0`),
+			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS quota_limit bigint NOT NULL DEFAULT 0`),
+		)
 	}
 
 	for _, q := range queries {

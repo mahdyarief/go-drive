@@ -172,6 +172,8 @@ export interface Store {
   ingest_mode: string
   read_priority: number
   config: Record<string, unknown>
+  quota_used: number
+  quota_limit: number
   last_tested_at: string | null
   last_synced_at: string | null
   created_at: string

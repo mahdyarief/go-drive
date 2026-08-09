@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,32 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 		if err := tx.NewSelect().Model(&stores).Order("created_at ASC").Scan(ctx); err != nil {
 			Err(c, http.StatusInternalServerError, "listing stores: "+err.Error())
 			return
+		}
+		// Backfill quota for GDrive stores that have never been measured (e.g.
+		// connected before the quota columns existed) so the quota bar always
+		// shows data without requiring a manual Test Connection.
+		for i := range stores {
+			s := &stores[i]
+			if s.Provider != "gdrive" || s.Status != "active" || s.QuotaLimit != 0 {
+				continue
+			}
+			st, err := store.BuildStorage(ctx, tx, s)
+			if err != nil {
+				continue
+			}
+			used, limit, err := st.Quota(ctx)
+			if err != nil || limit == 0 {
+				continue
+			}
+			now := time.Now()
+			if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
+				Where("id = ?", s.ID).
+				Set("quota_used = ?", used, "quota_limit = ?", limit).
+				Set("last_tested_at = ?", now, "updated_at = ?", now).
+				Exec(ctx); err == nil {
+				s.QuotaUsed = used
+				s.QuotaLimit = limit
+			}
 		}
 		var primaryID *uuid.UUID
 		var setting model.WorkspaceStorageSetting
@@ -68,6 +95,45 @@ func CreateStore(db *bun.DB) gin.HandlerFunc {
 		}
 		if req.Config == nil {
 			req.Config = map[string]any{}
+		}
+
+		// A gdrive store can be attached with just client id/secret; the
+		// refresh token is obtained later via the browser OAuth consent flow
+		// (Connect Google Drive on the store card). Such stores are created
+		// as "pending" and skip the connection test.
+		refreshToken, _ := req.Credentials["refreshToken"].(string)
+		gdrivePending := req.Provider == "gdrive" && strings.TrimSpace(refreshToken) == ""
+		if gdrivePending {
+			s := &model.Store{
+				ID:           uuid.New(),
+				Name:         req.Name,
+				Provider:     req.Provider,
+				Status:       "pending",
+				WriteMode:    orStr(req.WriteMode, "write"),
+				IngestMode:   orStr(req.IngestMode, "none"),
+				ReadPriority: req.ReadPriority,
+				Config:       req.Config,
+			}
+			if s.ReadPriority == 0 {
+				s.ReadPriority = 100
+			}
+			if _, err := tx.NewInsert().Model(s).Exec(ctx); err != nil {
+				Err(c, http.StatusInternalServerError, "creating store: "+err.Error())
+				return
+			}
+			if err := saveStoreCredentials(ctx, tx, s.ID, req.Credentials); err != nil {
+				Err(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+			count, err := tx.NewSelect().Model((*model.Store)(nil)).Count(ctx)
+			if err == nil && count == 1 {
+				if err := setPrimaryStore(ctx, tx, s.ID); err != nil {
+					Err(c, http.StatusInternalServerError, err.Error())
+					return
+				}
+			}
+			Created(c, gin.H{"store": s})
+			return
 		}
 
 		// Test the connection before persisting.
@@ -238,6 +304,7 @@ func TestStore(db *bun.DB) gin.HandlerFunc {
 		now := time.Now()
 		if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
 			Set("last_tested_at = ?", now, "updated_at = ?", now).
+			Set("quota_used = ?", used, "quota_limit = ?", limit).
 			Where("id = ?", id).
 			Exec(ctx); err != nil {
 			Err(c, http.StatusInternalServerError, "updating store: "+err.Error())
@@ -344,6 +411,23 @@ func saveStoreCredentials(ctx context.Context, tx bun.IDB, storeID uuid.UUID, cr
 		On("CONFLICT (store_id) DO UPDATE SET encrypted_credentials = EXCLUDED.encrypted_credentials, updated_at = CURRENT_TIMESTAMP").
 		Exec(ctx)
 	return err
+}
+
+// loadStoreCredentials reads + decrypts a store's stored credentials.
+func loadStoreCredentials(ctx context.Context, tx bun.IDB, storeID uuid.UUID) (map[string]any, error) {
+	var secret model.StoreSecret
+	if err := tx.NewSelect().Model(&secret).Where("store_id = ?", storeID).Scan(ctx); err != nil {
+		return nil, err
+	}
+	raw, err := crypto.Decrypt(secret.EncryptedCredentials)
+	if err != nil {
+		return nil, err
+	}
+	creds := map[string]any{}
+	if err := json.Unmarshal([]byte(raw), &creds); err != nil {
+		return nil, err
+	}
+	return creds, nil
 }
 
 // setPrimaryStore upserts the workspace_storage_settings row.
