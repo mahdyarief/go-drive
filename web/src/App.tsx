@@ -29,6 +29,7 @@ import SettingsNotificationsPage from '@/pages/app/settings/SettingsNotification
 import SharedLinkPage from '@/pages/public/SharedLinkPage'
 import UploadLinkPage from '@/pages/public/UploadLinkPage'
 import TrackedLinkPage from '@/pages/public/TrackedLinkPage'
+import { Toaster } from '@/components/ui/sonner'
 
 function AuthLoader({ children }: { children: React.ReactNode }) {
   const setUser = useAuthStore((s) => s.setUser)
@@ -66,6 +67,7 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <Toaster />
       <BrowserRouter>
         <AuthLoader>
           <Routes>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router'
@@ -25,6 +25,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Check, Database, KeyRound, Loader2, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+
+// formatBytes renders a byte count in a human-readable unit (KB/MB/GB/TB).
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
+  const value = bytes / 1024 ** i
+  return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
+}
 
 function copyText(text: string) {
   void navigator.clipboard.writeText(text)
@@ -100,7 +110,6 @@ export default function StoresPage() {
   const [keyCreatedData, setKeyCreatedData] = useState<CreateKeyData | null>(null)
   const [deleteKeyTarget, setDeleteKeyTarget] = useState<S3Key | null>(null)
   const [createKeyOpen, setCreateKeyOpen] = useState(false)
-  const [testResult, setTestResult] = useState<{ id: string; text: string; used?: number; limit?: number } | null>(null)
 
   // Create store form state
   const [form, setForm] = useState<StoreForm>({
@@ -115,6 +124,9 @@ export default function StoresPage() {
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [gdriveError, setGdriveError] = useState(false)
+  // Tracks OAuth states already handled so the complete call fires exactly
+  // once per state (React StrictMode double-runs effects in dev).
+  const handledGdriveStates = useRef(new Set<string>())
 
   // Handle the return from the Google consent screen: ?gdrive=connected&state=...
   useEffect(() => {
@@ -127,6 +139,10 @@ export default function StoresPage() {
       return
     }
     if (gdrive !== 'connected') return
+    // StrictMode double-mounts effects in dev; skip the duplicate so the
+    // complete endpoint is not called twice with the same state.
+    if (handledGdriveStates.current.has(state)) return
+    handledGdriveStates.current.add(state)
     tenantApi<GDriveCompleteData>(
       `/api/t/stores/gdrive/complete?state=${encodeURIComponent(state)}`,
       orgSlug,
@@ -141,12 +157,7 @@ export default function StoresPage() {
         )
         queryClient.invalidateQueries({ queryKey: ['t', 'stores', orgSlug] })
         queryClient.invalidateQueries({ queryKey: ['t', 'stores', 'sync', orgSlug] })
-        setTestResult({
-          id: data.storeId,
-          used: data.used,
-          limit: data.limit,
-          text: t('stores.testResult', { used: data.used, limit: data.limit }),
-        })
+        toast.success(t('stores.testConnected'))
       })
       .catch(() => {
         setGdriveError(true)
@@ -160,17 +171,7 @@ export default function StoresPage() {
       if (e.key !== GDRIVE_CONNECTED_KEY || !e.newValue || !orgSlug) return
       queryClient.invalidateQueries({ queryKey: ['t', 'stores', orgSlug] })
       queryClient.invalidateQueries({ queryKey: ['t', 'stores', 'sync', orgSlug] })
-      try {
-        const data = JSON.parse(e.newValue) as { storeId: string; used: number; limit: number }
-        setTestResult({
-          id: data.storeId,
-          used: data.used,
-          limit: data.limit,
-          text: t('stores.testResult', { used: data.used, limit: data.limit }),
-        })
-      } catch {
-        // ignore malformed payloads from other tabs
-      }
+      toast.success(t('stores.testConnected'))
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
@@ -263,16 +264,11 @@ export default function StoresPage() {
 
   const testStore = useMutation({
     mutationFn: (id: string) => tenantApi<TestStoreData>(`/api/t/stores/${id}/test`, orgSlug!, { method: 'POST' }),
-    onSuccess: (data, id) => {
-      setTestResult({
-        id,
-        used: data.used,
-        limit: data.limit,
-        text: t('stores.testResult', { used: data.used, limit: data.limit }),
-      })
+    onSuccess: () => {
+      toast.success(t('stores.testConnected'))
     },
     onError: () => {
-      setTestResult({ id: '', text: t('stores.testFailed') })
+      toast.error(t('stores.testFailed'))
     },
   })
 
@@ -418,13 +414,20 @@ export default function StoresPage() {
               </dl>
 
               {store.provider === 'gdrive' && store.status === 'active' && (
-                <Progress
-                  value={store.quota_limit > 0 ? Math.min(100, (store.quota_used / store.quota_limit) * 100) : 0}
-                  className="h-2"
-                />
-              )}
-              {testResult?.id === store.id && (
-                <p className="text-xs text-muted-foreground">{testResult.text}</p>
+                <div className="space-y-1">
+                  <Progress
+                    value={store.quota_limit > 0 ? Math.min(100, (store.quota_used / store.quota_limit) * 100) : 0}
+                    className="h-2"
+                  />
+                  {store.quota_limit > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('stores.quotaUsage', {
+                        used: formatBytes(store.quota_used),
+                        limit: formatBytes(store.quota_limit),
+                      })}
+                    </p>
+                  )}
+                </div>
               )}
 
               <div className="flex flex-wrap gap-2">

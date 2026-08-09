@@ -205,7 +205,10 @@ func GDriveStoreCallback() gin.HandlerFunc {
 
 // GDriveStoreComplete saves the refresh token into the store's credentials,
 // tests the connection, and flips the store to "active". The pending entry is
-// consumed here (one-shot) and must belong to the requesting org.
+// intentionally NOT consumed here: the complete call can legitimately fire
+// more than once (React StrictMode double-mounts effects in dev, or the user
+// refreshes the store page after the OAuth redirect), and the entry is
+// org-scoped + short-TTL so replays are harmless. It expires via oauthStateTTL.
 func GDriveStoreComplete(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgSlug := c.GetString("org_slug")
@@ -215,9 +218,6 @@ func GDriveStoreComplete(db *bun.DB) gin.HandlerFunc {
 
 		storeOAuthMu.Lock()
 		p, ok := pendingStoreMap[state]
-		if ok {
-			delete(pendingStoreMap, state)
-		}
 		storeOAuthMu.Unlock()
 
 		if !ok || p.orgSlug != orgSlug || p.refreshToken == "" {
