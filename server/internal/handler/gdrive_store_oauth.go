@@ -113,7 +113,11 @@ func GDriveStoreAuthURL(db *bun.DB) gin.HandlerFunc {
 		conf := storeOAuthConfig(clientID, clientSecret)
 		verifier := oauth2.GenerateVerifier()
 		state := randomState()
-		authURL := conf.AuthCodeURL(state, oauth2.S256ChallengeOption(verifier))
+		// access_type=offline requests a refresh token; prompt=consent forces
+		// Google to show the consent screen again so a fresh refresh token is
+		// issued even for accounts that already authorized this app
+		// (otherwise the exchange can succeed but return no refresh_token).
+		authURL := conf.AuthCodeURL(state, oauth2.S256ChallengeOption(verifier), oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent"))
 
 		storeOAuthMu.Lock()
 		pendingStoreMap[state] = pendingStoreOAuth{

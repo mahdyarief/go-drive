@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 
+	"go-drive/server/internal/config"
 	"go-drive/server/internal/crypto"
 	"go-drive/server/internal/model"
 	"go-drive/server/internal/storage"
@@ -60,7 +61,11 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 		if err := tx.NewSelect().Model(&setting).Limit(1).Scan(ctx); err == nil {
 			primaryID = &setting.PrimaryStoreID
 		}
-		Success(c, gin.H{"stores": stores, "primaryStoreId": primaryID})
+		Success(c, gin.H{
+			"stores":             stores,
+			"primaryStoreId":     primaryID,
+			"gdriveRedirectUri": config.BaseURL() + storeGDriveCallbackPath,
+		})
 	}
 }
 

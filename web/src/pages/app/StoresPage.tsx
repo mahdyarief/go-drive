@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router'
 import { tenantApi } from '@/lib/api'
 import type { ReplicationRun, S3Key, Store } from '@/lib/types'
 import { useOrgStore } from '@/store/org'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Check, Database, KeyRound, Loader2, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
+import { Check, Database, ExternalLink, HelpCircle, KeyRound, Loader2, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 // formatBytes renders a byte count in a human-readable unit (KB/MB/GB/TB).
@@ -47,6 +47,7 @@ const GDRIVE_CONNECTED_KEY = 'gdrive:connected'
 interface StoresData {
   stores: Store[]
   primaryStoreId: string | null
+  gdriveRedirectUri?: string
 }
 
 interface TestStoreData {
@@ -110,6 +111,7 @@ export default function StoresPage() {
   const [keyCreatedData, setKeyCreatedData] = useState<CreateKeyData | null>(null)
   const [deleteKeyTarget, setDeleteKeyTarget] = useState<S3Key | null>(null)
   const [createKeyOpen, setCreateKeyOpen] = useState(false)
+  const [showGdriveHelp, setShowGdriveHelp] = useState(false)
 
   // Create store form state
   const [form, setForm] = useState<StoreForm>({
@@ -311,6 +313,7 @@ export default function StoresPage() {
 
   const stores = storesQuery.data?.stores ?? []
   const primaryStoreId = storesQuery.data?.primaryStoreId ?? null
+  const gdriveRedirectUri = storesQuery.data?.gdriveRedirectUri
   const runs = syncQuery.data?.runs ?? []
   const keys = keysQuery.data?.keys ?? []
 
@@ -586,6 +589,10 @@ export default function StoresPage() {
                 <>
                   <Input placeholder={t('stores.clientId')} onChange={(e) => setCredentialField('clientId', e.target.value)} />
                   <Input type="password" placeholder={t('stores.clientSecret')} onChange={(e) => setCredentialField('clientSecret', e.target.value)} />
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => setShowGdriveHelp(true)}>
+                    <HelpCircle className="h-3.5 w-3.5 mr-1" />
+                    {t('stores.gdriveHelpTrigger')}
+                  </Button>
                 </>
               )}
             </div>
@@ -636,6 +643,41 @@ export default function StoresPage() {
               {t('stores.createStore')}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* GDrive credentials help dialog */}
+      <Dialog open={showGdriveHelp} onOpenChange={setShowGdriveHelp}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('stores.gdriveHelpTitle')}</DialogTitle>
+            <DialogDescription>{t('stores.gdriveHelpSubtitle')}</DialogDescription>
+          </DialogHeader>
+          <ol className="list-decimal space-y-2.5 pl-5 text-sm marker:font-medium marker:text-primary">
+            <li>{t('stores.gdriveHelpStep1')}</li>
+            <li>{t('stores.gdriveHelpStep2')}</li>
+            <li>{t('stores.gdriveHelpStep3')}</li>
+            <li>{t('stores.gdriveHelpStep4')}</li>
+            <li>{t('stores.gdriveHelpStep5')}</li>
+            <li>
+              {t('stores.gdriveHelpStep6')}
+              {gdriveRedirectUri && (
+                <code className="mt-2 block break-all rounded-md bg-muted px-2 py-1 text-xs">{gdriveRedirectUri}</code>
+              )}
+            </li>
+            <li>{t('stores.gdriveHelpStep7')}</li>
+          </ol>
+          <div className="flex justify-end">
+            <a
+              href="https://console.cloud.google.com/"
+              target="_blank"
+              rel="noreferrer"
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1" />
+              {t('stores.gdriveOpenConsole')}
+            </a>
+          </div>
         </DialogContent>
       </Dialog>
 
