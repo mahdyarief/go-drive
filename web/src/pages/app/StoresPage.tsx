@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Check, Database, ExternalLink, HelpCircle, KeyRound, Loader2, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
+import { Check, Database, ExternalLink, HelpCircle, KeyRound, Loader2, Pencil, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 // formatBytes renders a byte count in a human-readable unit (KB/MB/GB/TB).
@@ -38,6 +38,17 @@ function formatBytes(bytes: number): string {
 
 function copyText(text: string) {
   void navigator.clipboard.writeText(text)
+}
+
+// bytesToGB converts a byte count to gigabytes for the quota input field.
+function bytesToGB(bytes: number): number {
+  if (!Number.isFinite(bytes) || bytes <= 0) return 0
+  return bytes / 1024 ** 3
+}
+
+// emptyForm returns a fresh create-store form state.
+function emptyForm(): StoreForm {
+  return { name: '', provider: 'local', writeMode: 'write', ingestMode: 'none', readPriority: 100, quotaLimit: 0, config: {}, credentials: {} }
 }
 
 // localStorage key used to notify other tabs when a Google Drive connect
@@ -87,6 +98,7 @@ interface StoreForm {
   writeMode: string
   ingestMode: string
   readPriority: number
+  quotaLimit: number // GB
   config: Record<string, string>
   credentials: Record<string, string>
 }
@@ -108,6 +120,7 @@ export default function StoresPage() {
   const orgSlug = useOrgSlug()
 
   const [createOpen, setCreateOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<Store | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Store | null>(null)
   const [keyCreatedData, setKeyCreatedData] = useState<CreateKeyData | null>(null)
   const [deleteKeyTarget, setDeleteKeyTarget] = useState<S3Key | null>(null)
@@ -122,6 +135,7 @@ export default function StoresPage() {
     writeMode: 'write',
     ingestMode: 'none',
     readPriority: 100,
+    quotaLimit: 0,
     config: {},
     credentials: {},
   })
@@ -247,6 +261,7 @@ export default function StoresPage() {
           writeMode: f.writeMode,
           ingestMode: f.ingestMode,
           readPriority: f.readPriority,
+          quotaLimit: f.quotaLimit > 0 ? Math.round(f.quotaLimit * 1024 ** 3) : 0,
           config: f.config,
           credentials: f.credentials,
         }),
@@ -254,7 +269,29 @@ export default function StoresPage() {
     onSuccess: () => {
       invalidateStores()
       setCreateOpen(false)
-      setForm({ name: '', provider: 'local', writeMode: 'write', ingestMode: 'none', readPriority: 100, config: {}, credentials: {} })
+      setForm(emptyForm())
+    },
+  })
+
+  const updateStore = useMutation({
+    mutationFn: ({ id, f }: { id: string; f: StoreForm }) =>
+      tenantApi<{ store: Store }>(`/api/t/stores/${id}`, orgSlug!, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: f.name,
+          provider: f.provider,
+          writeMode: f.writeMode,
+          ingestMode: f.ingestMode,
+          readPriority: f.readPriority,
+          quotaLimit: f.quotaLimit > 0 ? Math.round(f.quotaLimit * 1024 ** 3) : 0,
+          config: f.config,
+        }),
+      }),
+    onSuccess: () => {
+      invalidateStores()
+      setCreateOpen(false)
+      setEditTarget(null)
+      toast.success(t('stores.storeUpdated'))
     },
   })
 
@@ -337,6 +374,22 @@ export default function StoresPage() {
     setForm((f) => ({ ...f, credentials: { ...f.credentials, [key]: value } }))
   }
 
+  // openEdit loads a store into the form so the shared dialog can update it.
+  const openEdit = (store: Store) => {
+    setForm({
+      name: store.name,
+      provider: store.provider as Provider,
+      writeMode: store.write_mode,
+      ingestMode: store.ingest_mode,
+      readPriority: store.read_priority,
+      quotaLimit: Math.round(bytesToGB(store.quota_limit)),
+      config: { ...(store.config as Record<string, string>) },
+      credentials: {},
+    })
+    setEditTarget(store)
+    setCreateOpen(true)
+  }
+
   const providerLabel = (p: string) => {
     if (p === 'local') return t('stores.providerLocal')
     if (p === 's3') return t('stores.providerS3')
@@ -351,7 +404,12 @@ export default function StoresPage() {
           <h1 className="text-2xl font-bold tracking-tight">{t('stores.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('stores.description')}</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button
+          onClick={() => {
+            setEditTarget(null)
+            setCreateOpen(true)
+          }}
+        >
           <Plus className="h-4 w-4 mr-2" />
           {t('stores.attachStore')}
         </Button>
@@ -426,9 +484,15 @@ export default function StoresPage() {
                   <dt className="text-muted-foreground">{t('stores.readPriority')}</dt>
                   <dd>{store.read_priority}</dd>
                 </div>
+                {store.provider === 'local' && !!store.config?.baseDir && (
+                  <div className="col-span-2">
+                    <dt className="text-muted-foreground">{t('stores.folderLocation')}</dt>
+                    <dd className="font-mono text-[11px] break-all">{String(store.config.baseDir)}</dd>
+                  </div>
+                )}
               </dl>
 
-              {store.provider === 'gdrive' && store.status === 'active' && (
+              {store.quota_limit > 0 && store.status === 'active' && (
                 <div className="space-y-1">
                   <Progress
                     value={store.quota_limit > 0 ? Math.min(100, (store.quota_used / store.quota_limit) * 100) : 0}
@@ -446,6 +510,10 @@ export default function StoresPage() {
               )}
 
               <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => openEdit(store)}>
+                  <Pencil className="h-3 w-3 mr-1" />
+                  {t('stores.editStore')}
+                </Button>
                 {store.provider === 'gdrive' && store.status !== 'active' && (
                   <Button variant="outline" size="sm" disabled={gdriveAuth.isPending} onClick={() => handleGdriveConnect(store.id)}>
                     {gdriveAuth.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
@@ -572,10 +640,16 @@ export default function StoresPage() {
       </Card>
 
       {/* Attach store dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open)
+          if (!open) setEditTarget(null)
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t('stores.createStore')}</DialogTitle>
+            <DialogTitle>{editTarget ? t('stores.editStore') : t('stores.createStore')}</DialogTitle>
             <DialogDescription>
               {t('stores.description')}
             </DialogDescription>
@@ -588,7 +662,7 @@ export default function StoresPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="store-provider">{t('stores.provider')}</Label>
-                <Select value={form.provider} onValueChange={(v) => setForm({ ...form, provider: v as Provider })}>
+                <Select value={form.provider} onValueChange={(v) => setForm({ ...form, provider: v as Provider })} disabled={!!editTarget}>
                   <SelectTrigger id="store-provider">
                     <SelectValue />
                   </SelectTrigger>
@@ -682,13 +756,34 @@ export default function StoresPage() {
                 onChange={(e) => setForm({ ...form, readPriority: Number(e.target.value) })}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="store-quota">{t('stores.quotaLimit')}</Label>
+              <Input
+                id="store-quota"
+                type="number"
+                min={0}
+                placeholder={t('stores.quotaLimitHint')}
+                value={form.quotaLimit || ''}
+                onChange={(e) => setForm({ ...form, quotaLimit: Number(e.target.value) })}
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreateOpen(false)
+                setEditTarget(null)
+              }}
+            >
               {t('links.cancel')}
             </Button>
-            <Button disabled={!form.name || createStore.isPending} onClick={() => createStore.mutate(form)}>
-              {t('stores.createStore')}
+            <Button
+              disabled={!form.name || createStore.isPending || updateStore.isPending}
+              onClick={() => (editTarget ? updateStore.mutate({ id: editTarget.id, f: form }) : createStore.mutate(form))}
+            >
+              {t(editTarget ? 'stores.editStore' : 'stores.createStore')}
             </Button>
           </DialogFooter>
         </DialogContent>

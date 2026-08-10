@@ -82,8 +82,17 @@ type storeRequest struct {
 	WriteMode    string         `json:"writeMode"`
 	IngestMode   string         `json:"ingestMode"`
 	ReadPriority int            `json:"readPriority"`
+	QuotaLimit   *int64         `json:"quotaLimit"`
 	Config       map[string]any `json:"config"`
 	Credentials  map[string]any `json:"credentials"`
+}
+
+// quotaLimit dereferences an optional quota limit; nil means 0 (unlimited).
+func quotaLimit(v *int64) int64 {
+	if v == nil {
+		return 0
+	}
+	return *v
 }
 
 // CreateStore attaches a new store. It tests the connection first; the first
@@ -122,6 +131,7 @@ func CreateStore(db *bun.DB) gin.HandlerFunc {
 				WriteMode:    orStr(req.WriteMode, "write"),
 				IngestMode:   orStr(req.IngestMode, "none"),
 				ReadPriority: req.ReadPriority,
+				QuotaLimit:   quotaLimit(req.QuotaLimit),
 				Config:       req.Config,
 			}
 			if s.ReadPriority == 0 {
@@ -173,6 +183,7 @@ func CreateStore(db *bun.DB) gin.HandlerFunc {
 			WriteMode:    orStr(req.WriteMode, "write"),
 			IngestMode:   orStr(req.IngestMode, "none"),
 			ReadPriority: req.ReadPriority,
+			QuotaLimit:   quotaLimit(req.QuotaLimit),
 			Config:       req.Config,
 			LastTestedAt: &now,
 		}
@@ -233,6 +244,9 @@ func UpdateStore(db *bun.DB) gin.HandlerFunc {
 		}
 		if req.ReadPriority != 0 {
 			u.Set("read_priority = ?", req.ReadPriority)
+		}
+		if req.QuotaLimit != nil {
+			u.Set("quota_limit = ?", *req.QuotaLimit)
 		}
 		if req.Config != nil {
 			u.Set("config = ?", req.Config)
