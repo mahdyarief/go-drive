@@ -560,7 +560,7 @@ export default function StoresPage() {
             <SelectTrigger className="max-w-xs">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="min-w-64">
               <SelectItem value="cumulative">{t('stores.storageModeCumulative')}</SelectItem>
               <SelectItem value="replicate">{t('stores.storageModeReplicate')}</SelectItem>
             </SelectContent>

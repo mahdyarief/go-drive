@@ -58,6 +58,11 @@ func IngestFromStore(ctx context.Context, tx bun.IDB, storeID uuid.UUID, trigger
 		existing[f.Name] = true
 	}
 
+	// The workspace storage mode decides how ingested objects are treated:
+	// cumulative keeps the workspace copy on the primary store only, while
+	// replicate fans it out to every other writable store.
+	mode, _ := GetStorageMode(ctx, tx)
+
 	ingested := 0
 	for _, obj := range objs {
 		if strings.Contains(obj.Path, ".locker-store-test-") {
@@ -123,13 +128,20 @@ func IngestFromStore(ctx context.Context, tx bun.IDB, storeID uuid.UUID, trigger
 		if err := markFileReady(ctx, tx, f.ID, blob.ID, primary.ID, primaryPath, "ingested"); err != nil {
 			return ingested, err
 		}
-		// Record the ingest store's copy (origin 'ingested').
+		// Record the ingest store's copy (origin 'ingested'). In replicate
+		// mode the source object is a genuine replica, so it is reported as
+		// available; in cumulative mode the row only exists so re-runs can
+		// skip the object and is not an active workspace location.
+		sourceState := "pending"
+		if mode == "replicate" {
+			sourceState = "available"
+		}
 		loc := &model.BlobLocation{
 			ID:          uuid.New(),
 			BlobID:      blob.ID,
 			StoreID:     storeID,
 			StoragePath: obj.Path,
-			State:       "available",
+			State:       sourceState,
 			Origin:      "ingested",
 		}
 		if _, err := tx.NewInsert().Model(loc).
@@ -138,7 +150,7 @@ func IngestFromStore(ctx context.Context, tx bun.IDB, storeID uuid.UUID, trigger
 			return ingested, fmt.Errorf("store: recording ingest location: %w", err)
 		}
 		// Fan out to other writable stores (replicate mode only).
-		if mode, err := GetStorageMode(ctx, tx); err == nil && mode == "replicate" {
+		if mode == "replicate" {
 			_ = SyncFileToStores(ctx, tx, f.ID, &storeID, nil, triggeredBy)
 		}
 		ingested++
