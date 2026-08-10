@@ -118,6 +118,11 @@ export default function StoresPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const orgSlug = useOrgSlug()
+  // S3 gateway endpoint for the connect guide. In development the app runs
+  // on the Vite port (:5173), but the dev proxy rewrites the Host header
+  // which breaks AWS SigV4 — so S3 clients must target the API port (:8081).
+  const serverBase = window.location.port === '5173' ? 'http://localhost:8081' : window.location.origin
+  const s3Endpoint = `${serverBase}/api/s3/${orgSlug ?? ''}`
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Store | null>(null)
@@ -126,6 +131,7 @@ export default function StoresPage() {
   const [deleteKeyTarget, setDeleteKeyTarget] = useState<S3Key | null>(null)
   const [createKeyOpen, setCreateKeyOpen] = useState(false)
   const [showGdriveHelp, setShowGdriveHelp] = useState(false)
+  const [showS3Help, setShowS3Help] = useState(false)
   const [showLocalHelp, setShowLocalHelp] = useState(false)
 
   // Create store form state
@@ -640,6 +646,10 @@ export default function StoresPage() {
               </div>
             </div>
           ))}
+          <Button variant="ghost" size="sm" className="mt-1" onClick={() => setShowS3Help(true)}>
+            <HelpCircle className="h-3.5 w-3.5 mr-1" />
+            {t('stores.s3ConnectTrigger')}
+          </Button>
         </CardContent>
       </Card>
 
@@ -960,6 +970,75 @@ export default function StoresPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* S3 connect guide dialog */}
+      <Dialog open={showS3Help} onOpenChange={setShowS3Help}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('stores.s3ConnectTitle')}</DialogTitle>
+            <DialogDescription>{t('stores.s3ConnectSubtitle')}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <ol className="list-decimal space-y-1 pl-4">
+              <li>{t('stores.s3ConnectStep1')}</li>
+              <li>{t('stores.s3ConnectStep2')}</li>
+            </ol>
+            <div className="space-y-2">
+              <Label>{t('stores.s3ConnectEndpoint')}</Label>
+              <div className="flex gap-2">
+                <Input readOnly value={s3Endpoint} className="font-mono text-xs" />
+                <Button variant="outline" onClick={() => copyText(s3Endpoint)}>
+                  {t('stores.s3ConnectCopyEndpoint')}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="font-medium">{t('stores.s3ConnectFeatures')}</p>
+              <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                <li>{t('stores.s3ConnectFeatureFolders')}</li>
+                <li>{t('stores.s3ConnectFeatureList')}</li>
+                <li>{t('stores.s3ConnectFeatureUpload')}</li>
+                <li>{t('stores.s3ConnectFeatureDownload')}</li>
+                <li>{t('stores.s3ConnectFeatureDelete')}</li>
+                <li>{t('stores.s3ConnectFeatureMultipart')}</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <p className="font-medium">{t('stores.s3ConnectAwsCli')}</p>
+              <p className="text-xs text-muted-foreground">{t('stores.s3ConnectAwsCliNote')}</p>
+              <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">{`aws configure
+aws --endpoint-url ${s3Endpoint} s3 ls s3://
+aws --endpoint-url ${s3Endpoint} s3 cp file.txt s3://hello.txt
+aws --endpoint-url ${s3Endpoint} s3 cp s3://hello.txt file.txt`}</pre>
+            </div>
+            <div className="space-y-2">
+              <p className="font-medium">{t('stores.s3ConnectRclone')}</p>
+              <p className="text-xs text-muted-foreground">{t('stores.s3ConnectRcloneNote')}</p>
+              <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">{`rclone config
+  type = s3
+  provider = Other
+  endpoint = ${s3Endpoint}
+  access_key_id = <access key id>
+  secret_access_key = <secret access key>
+  region = us-east-1
+
+rclone ls <remote>:
+rclone copy file.txt <remote>:
+rclone copy <remote>:hello.txt ./`}</pre>
+            </div>
+            <p className="text-xs text-muted-foreground">{t('stores.s3ConnectDevNote')}</p>
+            <p className="text-xs">
+              {t('stores.s3ConnectDocsNote')}{' '}
+              <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html" target="_blank" rel="noreferrer" className="text-primary underline">
+                {t('stores.s3ConnectDocsLink')}
+              </a>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowS3Help(false)}>{t('links.save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
