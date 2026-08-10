@@ -137,8 +137,10 @@ func IngestFromStore(ctx context.Context, tx bun.IDB, storeID uuid.UUID, trigger
 			Exec(ctx); err != nil {
 			return ingested, fmt.Errorf("store: recording ingest location: %w", err)
 		}
-		// Fan out to other writable stores.
-		_ = SyncFileToStores(ctx, tx, f.ID, &storeID, nil, triggeredBy)
+		// Fan out to other writable stores (replicate mode only).
+		if mode, err := GetStorageMode(ctx, tx); err == nil && mode == "replicate" {
+			_ = SyncFileToStores(ctx, tx, f.ID, &storeID, nil, triggeredBy)
+		}
 		ingested++
 	}
 	return ingested, nil

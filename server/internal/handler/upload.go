@@ -41,8 +41,9 @@ func UploadFile(db *bun.DB) gin.HandlerFunc {
 			folderID = &id
 		}
 
-		// Resolve the primary store for this workspace.
-		s, err := store.ResolvePrimaryStore(ctx, tx)
+		// Resolve the write store for this workspace (primary in replicate mode,
+		// quota-aware in cumulative mode).
+		s, err := store.ResolveUploadStore(ctx, tx, fileHeader.Size)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, "no active storage configured: "+err.Error())
 			return
@@ -92,10 +93,13 @@ func UploadFile(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Replication fanout to writable replicas (M7). Runs synchronously in
-		// the tenant tx; failures are non-fatal — the object is already on the
-		// primary store, so the upload still succeeds.
-		_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, userID)
+		// Replication fanout to writable replicas (M7). Only in replicate mode;
+		// cumulative mode keeps each file on a single store. Runs synchronously
+		// in the tenant tx; failures are non-fatal — the object is already on
+		// the write store, so the upload still succeeds.
+		if mode, err := store.GetStorageMode(ctx, tx); err == nil && mode == "replicate" {
+			_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, userID)
+		}
 
 		Created(c, gin.H{"file": f})
 	}

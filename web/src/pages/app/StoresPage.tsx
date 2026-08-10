@@ -47,6 +47,7 @@ const GDRIVE_CONNECTED_KEY = 'gdrive:connected'
 interface StoresData {
   stores: Store[]
   primaryStoreId: string | null
+  storageMode?: string
   gdriveRedirectUri?: string
 }
 
@@ -290,6 +291,15 @@ export default function StoresPage() {
     onSuccess: invalidateStores,
   })
 
+  const setStorageMode = useMutation({
+    mutationFn: (mode: string) =>
+      tenantApi<{ storageMode: string }>('/api/t/storage-mode', orgSlug!, {
+        method: 'PATCH',
+        body: JSON.stringify({ storage_mode: mode }),
+      }),
+    onSuccess: invalidateStores,
+  })
+
   const createKey = useMutation({
     mutationFn: () =>
       tenantApi<CreateKeyData>('/api/t/s3-keys', orgSlug!, {
@@ -314,6 +324,7 @@ export default function StoresPage() {
 
   const stores = storesQuery.data?.stores ?? []
   const primaryStoreId = storesQuery.data?.primaryStoreId ?? null
+  const storageMode = storesQuery.data?.storageMode ?? 'cumulative'
   const gdriveRedirectUri = storesQuery.data?.gdriveRedirectUri
   const runs = syncQuery.data?.runs ?? []
   const keys = keysQuery.data?.keys ?? []
@@ -467,32 +478,64 @@ export default function StoresPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
+            <Database className="h-4 w-4" />
+            {t('stores.storageMode')}
+          </CardTitle>
+          <CardDescription>{t('stores.storageModeHint')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <Select value={storageMode} onValueChange={(v) => v && setStorageMode.mutate(v)}>
+            <SelectTrigger className="max-w-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cumulative">{t('stores.storageModeCumulative')}</SelectItem>
+              <SelectItem value="replicate">{t('stores.storageModeReplicate')}</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {storageMode === 'cumulative'
+              ? t('stores.storageModeCumulativeDesc')
+              : t('stores.storageModeReplicateDesc')}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
             <RefreshCw className="h-4 w-4" />
             {t('stores.syncTitle')}
           </CardTitle>
           <CardDescription>
-            <Button variant="outline" size="sm" disabled={triggerSync.isPending} onClick={() => triggerSync.mutate()}>
-              {t('stores.triggerSync')}
-            </Button>
+            {storageMode === 'replicate' ? (
+              <Button variant="outline" size="sm" disabled={triggerSync.isPending} onClick={() => triggerSync.mutate()}>
+                {t('stores.triggerSync')}
+              </Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">{t('stores.syncDisabledCumulative')}</p>
+            )}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {runs.length === 0 && <p className="text-muted-foreground">{t('stores.noRuns')}</p>}
-          {runs.map((run) => (
-            <div key={run.id} className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <p className="text-sm font-medium capitalize">{run.kind}</p>
-                <p className="text-xs text-muted-foreground">
-                  {t('stores.runItems', { processed: run.processed_items, total: run.total_items })}
-                  {run.failed_items > 0 && ` · ${t('stores.runFailed', { failed: run.failed_items })}`}
-                </p>
+        {storageMode === 'replicate' && (
+          <CardContent className="space-y-2 text-sm">
+            {runs.length === 0 && <p className="text-muted-foreground">{t('stores.noRuns')}</p>}
+            {runs.map((run) => (
+              <div key={run.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium capitalize">{run.kind}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('stores.runItems', { processed: run.processed_items, total: run.total_items })}
+                    {run.failed_items > 0 && ` · ${t('stores.runFailed', { failed: run.failed_items })}`}
+                  </p>
+                </div>
+                <Badge variant={run.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
+                  {run.status}
+                </Badge>
               </div>
-              <Badge variant={run.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
-                {run.status}
-              </Badge>
-            </div>
-          ))}
-        </CardContent>
+            ))}
+          </CardContent>
+        )}
       </Card>
 
       <Separator />

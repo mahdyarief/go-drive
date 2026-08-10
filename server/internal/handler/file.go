@@ -31,7 +31,7 @@ func FileDownloadURL(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 
-		s, err := store.ResolvePrimaryStore(ctx, tx)
+		s, path, err := store.ResolveReadStore(ctx, tx, f.BlobID, f.StoragePath)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, "no active storage configured")
 			return
@@ -42,7 +42,7 @@ func FileDownloadURL(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 
-		url, err := st.GetSignedURL(ctx, f.StoragePath, time.Hour)
+		url, err := st.GetSignedURL(ctx, path, time.Hour)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotSupported) {
 				Err(c, http.StatusNotImplemented, "signed URLs not supported for this provider")
@@ -260,7 +260,7 @@ func UpdateFile(db *bun.DB) gin.HandlerFunc {
 		// Physically relocate the object before committing the DB change so a
 		// failure leaves the old record intact.
 		if newKey != oldKey {
-			s, err := store.ResolvePrimaryStore(ctx, tx)
+			s, path, err := store.ResolveReadStore(ctx, tx, f.BlobID, oldKey)
 			if err != nil {
 				Err(c, http.StatusInternalServerError, "no active storage configured")
 				return
@@ -270,7 +270,7 @@ func UpdateFile(db *bun.DB) gin.HandlerFunc {
 				Err(c, http.StatusInternalServerError, "building storage: "+err.Error())
 				return
 			}
-			if err := moveObject(ctx, st, oldKey, newKey, f.MimeType); err != nil {
+			if err := moveObject(ctx, st, path, newKey, f.MimeType); err != nil {
 				Err(c, http.StatusInternalServerError, "moving file: "+err.Error())
 				return
 			}

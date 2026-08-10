@@ -288,8 +288,9 @@ func PublicUpload(db *bun.DB) gin.HandlerFunc {
 			}
 		}
 
-		// Resolve the primary store and build the object key (display path).
-		s, err := store.ResolvePrimaryStore(ctx, tx)
+		// Resolve the write store (primary in replicate mode, quota-aware in
+		// cumulative mode) and build the object key (display path).
+		s, err := store.ResolveUploadStore(ctx, tx, fileHeader.Size)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, "no active storage configured: "+err.Error())
 			return
@@ -336,8 +337,11 @@ func PublicUpload(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, "updating upload count: "+err.Error())
 			return
 		}
-		// Replication fanout to writable replicas (M7); non-fatal.
-		_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, link.UserID)
+		// Replication fanout to writable replicas (M7); non-fatal. Only in
+		// replicate mode — cumulative mode keeps each file on a single store.
+		if mode, err := store.GetStorageMode(ctx, tx); err == nil && mode == "replicate" {
+			_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, link.UserID)
+		}
 		Created(c, gin.H{"file": f})
 	}
 }

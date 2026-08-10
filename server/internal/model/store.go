@@ -40,12 +40,16 @@ type StoreSecret struct {
 	UpdatedAt            time.Time `json:"updated_at" bun:"updated_at,nullzero,notnull,default:current_timestamp"`
 }
 
-// WorkspaceStorageSetting points a workspace at its primary store (1:1).
+// WorkspaceStorageSetting points a workspace at its primary store (1:1) and
+// carries the global storage mode: 'replicate' (master/slave fan-out) or
+// 'cumulative' (distributed — each file lives in one store, total capacity
+// is the sum of all store quotas).
 type WorkspaceStorageSetting struct {
 	bun.BaseModel `bun:"table:workspace_storage_settings"`
 
 	WorkspaceID    uuid.UUID `json:"workspace_id" bun:"workspace_id,pk,type:uuid"`
 	PrimaryStoreID uuid.UUID `json:"primary_store_id" bun:"primary_store_id,type:uuid,notnull"`
+	StorageMode    string    `json:"storage_mode" bun:"storage_mode,notnull,default:'cumulative'"`
 	CreatedAt      time.Time `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
 	UpdatedAt      time.Time `json:"updated_at" bun:"updated_at,nullzero,notnull,default:current_timestamp"`
 }

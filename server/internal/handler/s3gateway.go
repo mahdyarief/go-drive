@@ -205,12 +205,17 @@ func s3GetObject(c *gin.Context, tx bun.IDB, key string) {
 		s3Err(c, http.StatusNotFound, "NoSuchKey", "object not found")
 		return
 	}
-	st, _, err := buildGatewayStorage(ctx, tx)
+	s, path, err := store.ResolveReadStore(ctx, tx, f.BlobID, f.StoragePath)
 	if err != nil {
 		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
 		return
 	}
-	body, size, err := st.Download(ctx, f.StoragePath)
+	st, err := store.BuildStorage(ctx, tx, s)
+	if err != nil {
+		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
+		return
+	}
+	body, size, err := st.Download(ctx, path)
 	if err != nil {
 		s3Err(c, http.StatusNotFound, "NoSuchKey", "object not found")
 		return
@@ -290,7 +295,9 @@ func s3PutObject(c *gin.Context, tx bun.IDB, key, userID string) {
 		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
 		return
 	}
-	_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, userID)
+	if mode, err := store.GetStorageMode(ctx, tx); err == nil && mode == "replicate" {
+		_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, userID)
+	}
 
 	c.Header("ETag", etag)
 	c.Status(http.StatusOK)
@@ -591,7 +598,9 @@ func s3CompleteMultipartUpload(c *gin.Context, tx bun.IDB, key, uploadID string)
 		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
 		return
 	}
-	_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, up.UserID)
+	if mode, err := store.GetStorageMode(ctx, tx); err == nil && mode == "replicate" {
+		_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, up.UserID)
+	}
 
 	// Clean up the upload + part rows.
 	if _, err := tx.NewDelete().Model((*model.S3MultipartPart)(nil)).Where("upload_id = ?", uploadID).Exec(ctx); err != nil {

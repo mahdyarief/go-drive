@@ -57,13 +57,18 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 			}
 		}
 		var primaryID *uuid.UUID
+		storageMode := "cumulative"
 		var setting model.WorkspaceStorageSetting
 		if err := tx.NewSelect().Model(&setting).Limit(1).Scan(ctx); err == nil {
 			primaryID = &setting.PrimaryStoreID
+			if setting.StorageMode != "" {
+				storageMode = setting.StorageMode
+			}
 		}
 		Success(c, gin.H{
 			"stores":             stores,
 			"primaryStoreId":     primaryID,
+			"storageMode":        storageMode,
 			"gdriveRedirectUri": config.BaseURL() + storeGDriveCallbackPath,
 		})
 	}
@@ -342,6 +347,57 @@ func SetPrimaryStore(db *bun.DB) gin.HandlerFunc {
 	}
 }
 
+// SetStorageMode updates the workspace's global storage mode ('replicate' or
+// 'cumulative'). Body: { storage_mode: "replicate" | "cumulative" }.
+func SetStorageMode(db *bun.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tx := c.MustGet("tenant_tx").(bun.Tx)
+		ctx := c.Request.Context()
+
+		var req struct {
+			StorageMode string `json:"storage_mode"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			Err(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		mode := strings.TrimSpace(req.StorageMode)
+		if mode != "replicate" && mode != "cumulative" {
+			Err(c, http.StatusBadRequest, "storage_mode must be 'replicate' or 'cumulative'")
+			return
+		}
+
+		var setting model.WorkspaceStorageSetting
+		err := tx.NewSelect().Model(&setting).Limit(1).Scan(ctx)
+		if err != nil {
+			// No settings row yet (pre-seed tenant with stores but no
+			// workspace_storage_settings row). Create one; ResolvePrimaryStore
+			// falls back to the first active write store when the primary id
+			// is a zero UUID.
+			_, err = tx.NewInsert().Model(&model.WorkspaceStorageSetting{
+				WorkspaceID:    uuid.Nil,
+				PrimaryStoreID: uuid.Nil,
+				StorageMode:    mode,
+			}).Exec(ctx)
+			if err != nil {
+				Err(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+			Success(c, gin.H{"storageMode": mode})
+			return
+		}
+
+		if _, err := tx.NewUpdate().Model((*model.WorkspaceStorageSetting)(nil)).
+			Set("storage_mode = ?", mode, "updated_at = ?", time.Now()).
+			Where("workspace_id = ?", setting.WorkspaceID).
+			Exec(ctx); err != nil {
+			Err(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		Success(c, gin.H{"storageMode": mode})
+	}
+}
+
 // SyncStatus returns the replication run history.
 func SyncStatus(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -357,12 +413,23 @@ func SyncStatus(db *bun.DB) gin.HandlerFunc {
 	}
 }
 
-// TriggerSync replicates every ready file to all writable stores.
+// TriggerSync replicates every ready file to all writable stores. No-op in
+// cumulative mode, where each file lives on a single store by design.
 func TriggerSync(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		userID := c.GetString("user_id")
 		ctx := c.Request.Context()
+
+		mode, err := store.GetStorageMode(ctx, tx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if mode != "replicate" {
+			Err(c, http.StatusBadRequest, "replication is disabled in cumulative mode")
+			return
+		}
 
 		run, err := store.SyncWorkspace(ctx, tx, nil, userID)
 		if err != nil {

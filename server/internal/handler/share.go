@@ -264,7 +264,7 @@ func PublicShareDownload(db *bun.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		s, err := store.ResolvePrimaryStore(ctx, tx)
+		s, path, err := store.ResolveReadStore(ctx, tx, f.BlobID, f.StoragePath)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, "no active storage configured")
 			return
@@ -274,7 +274,7 @@ func PublicShareDownload(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, "building storage: "+err.Error())
 			return
 		}
-		url, err := st.GetSignedURL(ctx, f.StoragePath, time.Hour)
+		url, err := st.GetSignedURL(ctx, path, time.Hour)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotSupported) {
 				Err(c, http.StatusNotImplemented, "signed URLs not supported for this provider")
@@ -312,7 +312,7 @@ func PublicShareRaw(db *bun.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		s, err := store.ResolvePrimaryStore(ctx, tx)
+		s, path, err := store.ResolveReadStore(ctx, tx, f.BlobID, f.StoragePath)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, "no active storage configured")
 			return
@@ -322,7 +322,7 @@ func PublicShareRaw(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, "building storage: "+err.Error())
 			return
 		}
-		r, size, err := st.Download(ctx, f.StoragePath)
+		r, size, err := st.Download(ctx, path)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, "downloading file: "+err.Error())
 			return

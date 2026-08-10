@@ -76,6 +76,7 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		tenant.POST("/stores/:id/ingest", handler.TriggerIngest(db))
 		tenant.GET("/stores/sync", handler.SyncStatus(db))
 		tenant.POST("/stores/sync", handler.TriggerSync(db))
+		tenant.PATCH("/storage-mode", handler.SetStorageMode(db))
 		// Per-tenant Google Drive OAuth consent flow (Attach Store → connect from store card)
 		tenant.POST("/stores/:id/gdrive/auth-url", handler.GDriveStoreAuthURL(db))
 		tenant.GET("/stores/gdrive/complete", handler.GDriveStoreComplete(db))

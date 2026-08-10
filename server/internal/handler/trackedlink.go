@@ -342,7 +342,7 @@ func PublicTrackedDownload(db *bun.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		st, err := buildPrimaryStorage(ctx, tx)
+		st, err := buildReadStorage(ctx, tx, f.BlobID, f.StoragePath)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, err.Error())
 			return
@@ -391,7 +391,7 @@ func PublicTrackedRaw(db *bun.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		st, err := buildPrimaryStorage(ctx, tx)
+		st, err := buildReadStorage(ctx, tx, f.BlobID, f.StoragePath)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, err.Error())
 			return
@@ -561,9 +561,11 @@ func parseUA(ua string) (browser, osName, device string) {
 	return browser, osName, device
 }
 
-// buildPrimaryStorage resolves the primary store and hydrates its Storage.
-func buildPrimaryStorage(ctx context.Context, tx bun.Tx) (storage.Storage, error) {
-	s, err := store.ResolvePrimaryStore(ctx, tx)
+// buildReadStorage resolves the store that physically holds the blob (via
+// blob_locations, mode-aware) and hydrates its Storage. Falls back to the
+// primary store when no location row exists.
+func buildReadStorage(ctx context.Context, tx bun.IDB, blobID uuid.UUID, fallbackPath string) (storage.Storage, error) {
+	s, _, err := store.ResolveReadStore(ctx, tx, blobID, fallbackPath)
 	if err != nil {
 		return nil, errors.New("no active storage configured")
 	}
