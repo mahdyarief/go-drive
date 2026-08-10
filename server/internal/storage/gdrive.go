@@ -88,7 +88,7 @@ func (g *GDrive) List(ctx context.Context, prefix string) ([]Object, error) {
 		if f.Size != 0 {
 			size = f.Size
 		}
-		out = append(out, Object{Path: f.Id, Size: size})
+		out = append(out, Object{Path: f.Id, Name: f.Name, Size: size})
 	}
 	return out, nil
 }

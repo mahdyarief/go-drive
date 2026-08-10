@@ -12,7 +12,11 @@ import (
 
 // Object is a single stored object returned by List.
 type Object struct {
-	Path         string
+	// Path is the provider object key used for Download/Delete/Exists.
+	Path string
+	// Name is the human-readable file name when it differs from Path
+	// (e.g. GDrive keys are opaque file IDs; Name carries the real name).
+	Name         string
 	Size         int64
 	LastModified time.Time
 }

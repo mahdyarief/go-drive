@@ -42,6 +42,11 @@ func IngestFromStore(ctx context.Context, tx bun.IDB, storeID uuid.UUID, trigger
 	if err != nil {
 		return 0, fmt.Errorf("store: building primary storage: %w", err)
 	}
+	// When the ingest store is also the primary store, its objects already
+	// live in primary storage — copying them (download + re-upload) would
+	// create duplicates (e.g. a second file in the same Google Drive
+	// account). Only record the file as ready pointing at the existing path.
+	sameAsPrimary := storeID == primary.ID
 
 	// Existing root-level names for dedup.
 	existing := map[string]bool{}
@@ -84,24 +89,38 @@ func IngestFromStore(ctx context.Context, tx bun.IDB, storeID uuid.UUID, trigger
 		}
 
 		name := filepath.Base(display)
+		if obj.Name != "" {
+			// GDrive addresses objects by opaque file IDs (Path); use the real
+			// file name so ingested files aren't named after their file ID.
+			name = obj.Name
+		}
 		name = DedupName(name, existing)
 		mime := "application/octet-stream" // storage objects don't carry content type
 		blob, f, err := CreatePendingFileUpload(ctx, tx, triggeredBy, nil, name, display, mime, obj.Size)
 		if err != nil {
 			return ingested, err
 		}
-		r, _, err := st.Download(ctx, obj.Path)
-		if err != nil {
-			return ingested, fmt.Errorf("store: downloading %s: %w", obj.Path, err)
-		}
-		if err := pst.Upload(ctx, display, r, mime); err != nil {
+		// The object already lives in the primary store when the ingest
+		// store IS the primary store (e.g. one GDrive store serving as both
+		// workspace primary and ingest source). In that case skip the copy —
+		// re-uploading would create a brand-new file in the same account.
+		primaryPath := display
+		if !sameAsPrimary {
+			r, _, err := st.Download(ctx, obj.Path)
+			if err != nil {
+				return ingested, fmt.Errorf("store: downloading %s: %w", obj.Path, err)
+			}
+			if err := pst.Upload(ctx, display, r, mime); err != nil {
+				r.Close()
+				return ingested, fmt.Errorf("store: uploading to primary: %w", err)
+			}
 			r.Close()
-			return ingested, fmt.Errorf("store: uploading to primary: %w", err)
+		} else {
+			primaryPath = obj.Path
 		}
-		r.Close()
 
 		// Mark file ready and record the primary copy (origin 'ingested').
-		if err := markFileReady(ctx, tx, f.ID, blob.ID, primary.ID, display, "ingested"); err != nil {
+		if err := markFileReady(ctx, tx, f.ID, blob.ID, primary.ID, primaryPath, "ingested"); err != nil {
 			return ingested, err
 		}
 		// Record the ingest store's copy (origin 'ingested').
