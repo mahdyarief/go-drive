@@ -130,6 +130,13 @@ export interface LockerFile {
   updated_at: string
 }
 
+// FileStoreInfo is the store that holds a file's blob (from blob_locations).
+export interface FileStoreInfo {
+  id: string
+  name: string
+  provider: string
+}
+
 export interface Folder {
   id: string
   user_id: string

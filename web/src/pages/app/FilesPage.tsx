@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { tenantApi } from '@/lib/api'
-import type { BreadcrumbItem, Folder, LockerFile, ShareLink, StorageUsage, Tag } from '@/lib/types'
+import type { BreadcrumbItem, FileStoreInfo, Folder, LockerFile, ShareLink, StorageUsage, Tag } from '@/lib/types'
+import { Badge } from '@/components/ui/badge'
 import { useOrgStore } from '@/store/org'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,6 +60,7 @@ import {
 interface FileListData {
   files: LockerFile[]
   tags?: Record<string, Tag[]>
+  stores?: Record<string, FileStoreInfo[]>
   total: number
   page: number
   pageSize: number
@@ -300,6 +302,7 @@ export default function FilesPage() {
   const files = filesQuery.data?.files ?? []
   const crumbs = breadcrumbsQuery.data?.breadcrumbs ?? []
   const fileTags = filesQuery.data?.tags ?? {}
+  const fileStores = filesQuery.data?.stores ?? {}
   const allTags = tagsQuery.data?.tags ?? []
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -437,6 +440,11 @@ export default function FilesPage() {
           >
             <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="truncate text-sm font-medium">{file.name}</span>
+            {(fileStores[file.id] ?? []).map((s) => (
+              <Badge key={s.id} variant="secondary" className="shrink-0 text-[10px]">
+                {s.name}
+              </Badge>
+            ))}
             <span className="ml-auto text-xs text-muted-foreground shrink-0">
               {formatBytes(file.size)}
             </span>
@@ -472,6 +480,11 @@ export default function FilesPage() {
           <FileIcon className="h-8 w-8 text-muted-foreground" />
           <span className="w-full truncate text-center text-sm font-medium">{file.name}</span>
           <span className="text-xs text-muted-foreground">{formatBytes(file.size)}</span>
+          {(fileStores[file.id] ?? []).slice(0, 1).map((s) => (
+            <span key={s.id} className="text-[10px] text-muted-foreground">
+              {s.name}
+            </span>
+          ))}
         </button>
       ))}
     </div>

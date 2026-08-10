@@ -193,10 +193,16 @@ func ListFiles(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, "loading tags: "+err.Error())
 			return
 		}
+		storesByFile, err := loadStoresForFiles(ctx, tx, files)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "loading stores: "+err.Error())
+			return
+		}
 
 		Success(c, gin.H{
 			"files":    files,
 			"tags":     tagsByFile,
+			"stores":   storesByFile,
 			"total":    total,
 			"page":     page,
 			"pageSize": pageSize,
@@ -449,6 +455,56 @@ func loadTagsForFiles(ctx context.Context, tx bun.IDB, fileIDs []uuid.UUID) (map
 		if t, ok := tagByID[ft.TagID]; ok {
 			out[ft.FileID] = append(out[ft.FileID], t)
 		}
+	}
+	return out, nil
+}
+
+// fileStoreInfo is a lightweight store reference attached to each file in list
+// responses so the UI can show which storage holds the file's blob. A blob can
+// live on multiple stores in replicate mode; cumulative mode yields one.
+type fileStoreInfo struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Provider string `json:"provider"`
+}
+
+// loadStoresForFiles returns file_id -> stores holding the file's blob via the
+// blob_locations join. Only locations with state 'available' are reported.
+func loadStoresForFiles(ctx context.Context, tx bun.IDB, files []model.File) (map[uuid.UUID][]fileStoreInfo, error) {
+	out := make(map[uuid.UUID][]fileStoreInfo, len(files))
+	if len(files) == 0 {
+		return out, nil
+	}
+	blobIDs := make([]uuid.UUID, 0, len(files))
+	blobToFile := make(map[uuid.UUID]uuid.UUID, len(files))
+	for _, f := range files {
+		if _, ok := blobToFile[f.BlobID]; ok {
+			continue
+		}
+		blobToFile[f.BlobID] = f.ID
+		blobIDs = append(blobIDs, f.BlobID)
+	}
+	var rows []struct {
+		BlobID   uuid.UUID `bun:"blob_id"`
+		StoreID  uuid.UUID `bun:"store_id"`
+		Name     string    `bun:"name"`
+		Provider string    `bun:"provider"`
+	}
+	if err := tx.NewSelect().
+		TableExpr("blob_locations AS bl").
+		ColumnExpr("bl.blob_id AS blob_id, s.id AS store_id, s.name AS name, s.provider AS provider").
+		Join("JOIN stores AS s ON s.id = bl.store_id").
+		Where("bl.blob_id IN (?)", bun.In(blobIDs)).
+		Where("bl.state = 'available'").
+		Scan(ctx, &rows); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		fileID, ok := blobToFile[r.BlobID]
+		if !ok {
+			continue
+		}
+		out[fileID] = append(out[fileID], fileStoreInfo{ID: r.StoreID.String(), Name: r.Name, Provider: r.Provider})
 	}
 	return out, nil
 }
