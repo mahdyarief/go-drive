@@ -78,8 +78,26 @@ func StorageUsage(db *bun.DB) gin.HandlerFunc {
 		fileCount, _ := tx.NewSelect().Model((*model.File)(nil)).Where("status = 'ready'").Count(ctx)
 		folderCount, _ := tx.NewSelect().Model((*model.Folder)(nil)).Count(ctx)
 
-		// Limit is fixed at the Locker default until per-org quota wiring.
-		const limit int64 = 5 << 30 // 5 GB
+		// Workspace limit depends on the storage mode: cumulative sums every
+		// active store's quota (each file lives on one store), replicate uses
+		// the primary store's quota (every file is mirrored). 0 = unlimited.
+		var limit int64
+		mode, err := store.GetStorageMode(ctx, tx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if mode == "replicate" {
+			if primary, err := store.ResolvePrimaryStore(ctx, tx); err == nil {
+				limit = primary.QuotaLimit
+			}
+		} else if err := tx.NewSelect().Model((*model.Store)(nil)).
+			Where("status = 'active'").
+			ColumnExpr("COALESCE(SUM(quota_limit), 0)").
+			Scan(ctx, &limit); err != nil {
+			Err(c, http.StatusInternalServerError, "summing store quotas: "+err.Error())
+			return
+		}
 		percentage := 0.0
 		if limit > 0 {
 			percentage = float64(used) / float64(limit) * 100

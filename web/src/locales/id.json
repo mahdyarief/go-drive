@@ -522,6 +522,8 @@
     "deleteError": "Gagal menghapus penyimpanan.",
     "quotaLimit": "Batas Penyimpanan (GB)",
     "quotaLimitHint": "0 = tanpa batas",
+    "storageLimit": "Batas Penyimpanan",
+    "unlimited": "Tanpa Batas",
     "editStore": "Ubah Penyimpanan",
     "storeUpdated": "Penyimpanan diperbarui.",
     "folderLocation": "Lokasi Folder",

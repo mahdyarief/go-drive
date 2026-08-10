@@ -484,6 +484,10 @@ export default function StoresPage() {
                   <dt className="text-muted-foreground">{t('stores.readPriority')}</dt>
                   <dd>{store.read_priority}</dd>
                 </div>
+                <div>
+                  <dt className="text-muted-foreground">{t('stores.storageLimit')}</dt>
+                  <dd>{store.quota_limit > 0 ? formatBytes(store.quota_limit) : t('stores.unlimited')}</dd>
+                </div>
                 {store.provider === 'local' && !!store.config?.baseDir && (
                   <div className="col-span-2">
                     <dt className="text-muted-foreground">{t('stores.folderLocation')}</dt>

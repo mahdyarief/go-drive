@@ -522,6 +522,8 @@
     "deleteError": "Failed to delete store.",
     "quotaLimit": "Storage Limit (GB)",
     "quotaLimitHint": "0 = unlimited",
+    "storageLimit": "Storage Limit",
+    "unlimited": "Unlimited",
     "editStore": "Edit Store",
     "storeUpdated": "Store updated.",
     "folderLocation": "Folder Location",
