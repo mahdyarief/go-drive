@@ -79,6 +79,13 @@ func SQLiteTenantPath(slug string) string {
 	return filepath.Join(SQLiteTenantDir(), "tenant_"+slug+".db")
 }
 
+// LocalStoreBaseDir returns the default base directory for a tenant's
+// seeded local store, e.g. ./data/storage/<slug>. Derived from the SQLite
+// path so both drivers keep blob storage next to the app data directory.
+func LocalStoreBaseDir(slug string) string {
+	return filepath.Join(filepath.Dir(SQLitePath()), "storage", slug)
+}
+
 // SQLiteMaxOpenConns returns the max open connections for SQLite pools from
 // SQLITE_MAX_OPEN_CONNS or the default (8). Mid-to-high traffic: WAL allows
 // concurrent readers, so a modest pool parallelizes reads; writes stay

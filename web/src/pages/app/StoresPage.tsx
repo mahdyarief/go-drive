@@ -112,6 +112,7 @@ export default function StoresPage() {
   const [deleteKeyTarget, setDeleteKeyTarget] = useState<S3Key | null>(null)
   const [createKeyOpen, setCreateKeyOpen] = useState(false)
   const [showGdriveHelp, setShowGdriveHelp] = useState(false)
+  const [showLocalHelp, setShowLocalHelp] = useState(false)
 
   // Create store form state
   const [form, setForm] = useState<StoreForm>({
@@ -561,19 +562,23 @@ export default function StoresPage() {
               <Label>{t('stores.configSection')}</Label>
               {form.provider === 'local' && (
                 <>
-                  <Input placeholder={t('stores.baseDir')} onChange={(e) => setConfigField('baseDir', e.target.value)} />
-                  <Input placeholder={t('stores.publicUrl')} onChange={(e) => setConfigField('publicUrl', e.target.value)} />
+                  <Input placeholder={t('stores.baseDirPlaceholder')} onChange={(e) => setConfigField('baseDir', e.target.value)} />
+                  <Input placeholder={t('stores.publicUrlPlaceholder')} onChange={(e) => setConfigField('publicUrl', e.target.value)} />
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => setShowLocalHelp(true)}>
+                    <HelpCircle className="h-3.5 w-3.5 mr-1" />
+                    {t('stores.localHelpTrigger')}
+                  </Button>
                 </>
               )}
               {form.provider === 's3' && (
                 <>
-                  <Input placeholder={t('stores.bucket')} onChange={(e) => setConfigField('bucket', e.target.value)} />
-                  <Input placeholder={t('stores.region')} onChange={(e) => setConfigField('region', e.target.value)} />
-                  <Input placeholder={t('stores.endpoint')} onChange={(e) => setConfigField('endpoint', e.target.value)} />
+                  <Input placeholder={t('stores.bucketPlaceholder')} onChange={(e) => setConfigField('bucket', e.target.value)} />
+                  <Input placeholder={t('stores.regionPlaceholder')} onChange={(e) => setConfigField('region', e.target.value)} />
+                  <Input placeholder={t('stores.endpointPlaceholder')} onChange={(e) => setConfigField('endpoint', e.target.value)} />
                 </>
               )}
               {form.provider === 'gdrive' && (
-                <Input placeholder={t('stores.folderId')} onChange={(e) => setConfigField('folderId', e.target.value)} />
+                <Input placeholder={t('stores.folderIdPlaceholder')} onChange={(e) => setConfigField('folderId', e.target.value)} />
               )}
             </div>
 
@@ -643,6 +648,23 @@ export default function StoresPage() {
               {t('stores.createStore')}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Local storage best practices dialog */}
+      <Dialog open={showLocalHelp} onOpenChange={setShowLocalHelp}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('stores.localHelpTitle')}</DialogTitle>
+            <DialogDescription>{t('stores.localHelpSubtitle')}</DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc space-y-2.5 pl-5 text-sm marker:text-primary">
+            <li>{t('stores.localHelpTip1')}</li>
+            <li>{t('stores.localHelpTip2')}</li>
+            <li>{t('stores.localHelpTip3')}</li>
+            <li>{t('stores.localHelpTip4')}</li>
+            <li>{t('stores.localHelpTip5')}</li>
+          </ul>
         </DialogContent>
       </Dialog>
 

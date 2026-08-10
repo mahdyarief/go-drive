@@ -2,12 +2,16 @@ package migrate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
+
+	"go-drive/server/internal/config"
 )
 
 // sqliteDDL rewrites Postgres-only DDL fragments to SQLite-compatible forms.
@@ -379,17 +383,12 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 		)`),
 	}
 
-	// Additive alterations for schemas created before these columns existed.
-	// Postgres supports ADD COLUMN IF NOT EXISTS; SQLite lacks that syntax, so
-	// each column is added only when PRAGMA table_info shows it is missing.
-	if isSQLite(db) {
-		if err := sqliteEnsureColumn(ctx, db, "stores", "quota_used", "quota_used bigint NOT NULL DEFAULT 0"); err != nil {
-			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
-		}
-		if err := sqliteEnsureColumn(ctx, db, "stores", "quota_limit", "quota_limit bigint NOT NULL DEFAULT 0"); err != nil {
-			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
-		}
-	} else {
+	// Postgres additive alterations ride along in the same loop (ADD COLUMN
+	// IF NOT EXISTS is a no-op on fresh schemas). SQLite's run below after
+	// the loop because ALTER TABLE fails when the table does not exist yet
+	// (fresh tenant), and sqliteEnsureColumn's PRAGMA guard needs the table
+	// present to detect already-added columns.
+	if !isSQLite(db) {
 		queries = append(queries,
 			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS quota_used bigint NOT NULL DEFAULT 0`),
 			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS quota_limit bigint NOT NULL DEFAULT 0`),
@@ -405,6 +404,60 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 		}
 	}
 
+	if isSQLite(db) {
+		if err := sqliteEnsureColumn(ctx, db, "stores", "quota_used", "quota_used bigint NOT NULL DEFAULT 0"); err != nil {
+			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
+		}
+		if err := sqliteEnsureColumn(ctx, db, "stores", "quota_limit", "quota_limit bigint NOT NULL DEFAULT 0"); err != nil {
+			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
+		}
+	}
+
+	// Seed a ready-to-use local store so a fresh workspace can store files
+	// without attaching an external provider first. No-op when the tenant
+	// already has stores (existing tenants keep their configuration).
+	if err := seedDefaultLocalStore(ctx, db, prefix, slug); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// seedDefaultLocalStore inserts a local provider store as the workspace
+// primary when the stores table is empty. Runs inside CreateTenantTables so
+// both new tenants and backfilled tenants (RunTenantMigrations on Postgres,
+// first DB open on SQLite) get a working default.
+func seedDefaultLocalStore(ctx context.Context, db bun.IDB, prefix, slug string) error {
+	var count int
+	if err := db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %sstores", prefix)).Scan(&count); err != nil {
+		return fmt.Errorf("seeding local store: counting stores: %w", err)
+	}
+	if count > 0 {
+		return nil
+	}
+
+	storeID := uuid.New()
+	cfg, err := json.Marshal(map[string]any{
+		"baseDir":   config.LocalStoreBaseDir(slug),
+		"publicUrl": config.BaseURL(),
+	})
+	if err != nil {
+		return fmt.Errorf("seeding local store: marshaling config: %w", err)
+	}
+	cfgLit := string(cfg)
+
+	insert := fmt.Sprintf("INSERT INTO %sstores (id, name, provider, status, write_mode, config) VALUES (?, 'Local Storage', 'local', 'active', 'write', ?)", prefix)
+	setting := fmt.Sprintf("INSERT INTO %sworkspace_storage_settings (workspace_id, primary_store_id) VALUES (?, ?)", prefix)
+	if !isSQLite(db) {
+		insert = fmt.Sprintf("INSERT INTO %sstores (id, name, provider, status, write_mode, config) VALUES ($1, 'Local Storage', 'local', 'active', 'write', $2::jsonb)", prefix)
+		setting = fmt.Sprintf("INSERT INTO %sworkspace_storage_settings (workspace_id, primary_store_id) VALUES ($1, $2)", prefix)
+	}
+	if _, err := db.ExecContext(ctx, insert, storeID.String(), cfgLit); err != nil {
+		return fmt.Errorf("seeding local store: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, setting, uuid.Nil.String(), storeID.String()); err != nil {
+		return fmt.Errorf("seeding primary store: %w", err)
+	}
 	return nil
 }
 
