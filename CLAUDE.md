@@ -44,6 +44,8 @@ In **production** (`make build`):
 ## Web rules
 Always use shadcn-ui skill on React web solution.
 
+**No god files**: React pages must be split into small, single-responsibility components and modules. A page that grows past ~500 lines must be broken up — extract self-contained features (cards, dialogs, forms) into their own component files under `pages/<page>/`, and shared types/helpers into a colocated module (e.g. `pages/<page>/<page>.ts`). A page file should stay thin — mostly composition of its components.
+
 ## Multi-Tenancy Architecture
 
 The app uses **schema-per-tenant** isolation on Neon Postgres:
