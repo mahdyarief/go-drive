@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -352,6 +353,33 @@ func DeleteFile(db *bun.DB) gin.HandlerFunc {
 }
 
 // SearchFiles returns files matching q by name (transcription fallback M10).
+// GetFile returns a single file by ID. The preview page uses this endpoint so
+// it survives hard refreshes instead of relying on navigation state.
+func GetFile(db *bun.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tx := c.MustGet("tenant_tx").(bun.Tx)
+		ctx := c.Request.Context()
+
+		id, err := uuid.Parse(c.Param("id"))
+		if err != nil {
+			Err(c, http.StatusBadRequest, "invalid file id")
+			return
+		}
+
+		var f model.File
+		if err := tx.NewSelect().Model(&f).Where("id = ?", id).Scan(ctx); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				Err(c, http.StatusNotFound, "file not found")
+				return
+			}
+			Err(c, http.StatusInternalServerError, "loading file: "+err.Error())
+			return
+		}
+
+		Success(c, gin.H{"file": f})
+	}
+}
+
 func SearchFiles(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)

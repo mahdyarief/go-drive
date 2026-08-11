@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Check, Copy, Download, Eye, FolderInput, Loader2, Pencil, Plus, Share2, Tag as TagIcon, Trash2 } from 'lucide-react'
 import type { ItemActions, ItemField } from './files'
+import { FolderPicker } from './FolderPicker'
 
 interface FileDialogsProps {
   // New folder dialog
@@ -39,6 +40,7 @@ interface FileDialogsProps {
   setMoveFolderId: (value: string) => void
   moveItemPending: boolean
   onMoveSubmit: () => void
+  orgSlug: string
   // Tags dialog
   tagTarget: LockerFile | null
   setTagTarget: (target: LockerFile | null) => void
@@ -78,7 +80,7 @@ export function FileDialogs(props: FileDialogsProps) {
   const {
     createOpen, setCreateOpen, newFolderName, setNewFolderName, createFolderPending, onCreateFolder,
     renameTarget, setRenameTarget, renameValue, setRenameValue, renameItemPending, onRenameSubmit,
-    moveTarget, setMoveTarget, moveFolderId, setMoveFolderId, moveItemPending, onMoveSubmit,
+    moveTarget, setMoveTarget, moveFolderId, setMoveFolderId, moveItemPending, onMoveSubmit, orgSlug,
     tagTarget, setTagTarget, selectedTagIds, setSelectedTagIds, newTagName, setNewTagName,
     allTags, createTagPending, onCreateTag, setFileTagsPending, onSaveTags,
     shareTarget, setShareTarget, copied, setCopied, shareUrl, sharePending, shareErrorMessage, onCopyShare,
@@ -146,13 +148,8 @@ export function FileDialogs(props: FileDialogsProps) {
             <DialogDescription>{t('files.moveHint')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="move-folder">{t('links.folderId')}</Label>
-            <Input
-              id="move-folder"
-              value={moveFolderId}
-              onChange={(e) => setMoveFolderId(e.target.value)}
-              placeholder="folderId"
-            />
+            <Label>{t('files.moveTo')}</Label>
+            <FolderPicker orgSlug={orgSlug} value={moveFolderId} onChange={setMoveFolderId} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMoveTarget(null)}>

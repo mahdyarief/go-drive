@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumb, BreadcrumbItem as BCItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { HardDrive, LayoutGrid, List, Plus, Upload } from 'lucide-react'
+import { HardDrive, LayoutGrid, List, Plus, Search, Upload, X } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { VIEW_MODE_KEY, copyToClipboard, formatBytes } from './files/files'
 import type {
   BreadcrumbsData,
@@ -18,6 +19,7 @@ import type {
   FolderListData,
   ItemActions,
   ItemField,
+  SearchResultsData,
   TagsData,
   ViewMode,
 } from './files/files'
@@ -32,6 +34,8 @@ export default function FilesPage() {
   const orgSlug = currentOrg?.slug
 
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
+  const [searchInput, setSearchInput] = useState('')
+  const [activeSearch, setActiveSearch] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY)
     return saved === 'grid' ? 'grid' : 'list'
@@ -69,6 +73,16 @@ export default function FilesPage() {
         orgSlug!,
       ),
     enabled: !!orgSlug,
+  })
+
+  const searchQuery = useQuery({
+    queryKey: ['t', 'files', 'search', orgSlug, activeSearch],
+    queryFn: () =>
+      tenantApi<SearchResultsData>(
+        `/api/t/files/search?q=${encodeURIComponent(activeSearch)}`,
+        orgSlug!,
+      ),
+    enabled: !!orgSlug && activeSearch.trim().length > 0,
   })
 
   const breadcrumbsQuery = useQuery({
@@ -219,6 +233,9 @@ export default function FilesPage() {
   const fileTags = filesQuery.data?.tags ?? {}
   const fileStores = filesQuery.data?.stores ?? {}
   const allTags = tagsQuery.data?.tags ?? []
+  const isSearching = activeSearch.trim().length > 0
+  const searchFiles = searchQuery.data?.files ?? []
+  const searchTags = searchQuery.data?.tags ?? {}
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files
@@ -243,7 +260,7 @@ export default function FilesPage() {
   }
 
   const openTagDialog = (file: LockerFile) => {
-    setSelectedTagIds((fileTags[file.id] ?? []).map((tag) => tag.id))
+    setSelectedTagIds(((isSearching ? searchTags : fileTags)[file.id] ?? []).map((tag) => tag.id))
     setNewTagName('')
     setTagTarget(file)
   }
@@ -297,6 +314,21 @@ export default function FilesPage() {
           <p className="text-sm text-muted-foreground">{t('files.description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <form
+            className="relative"
+            onSubmit={(e) => {
+              e.preventDefault()
+              setActiveSearch(searchInput.trim())
+            }}
+          >
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={t('files.searchPlaceholder')}
+              className="w-56 pl-8"
+            />
+          </form>
           <div className="flex items-center rounded-lg border p-0.5">
             <Button
               variant={viewMode === 'list' ? 'secondary' : 'ghost'}
@@ -367,28 +399,72 @@ export default function FilesPage() {
         </CardHeader>
         <Separator />
         <CardContent className="pt-4">
-          {(foldersQuery.isPending || filesQuery.isPending) && (
-            <p className="text-sm text-muted-foreground py-8 text-center">...</p>
-          )}
-          {(foldersQuery.isError || filesQuery.isError) && (
-            <p className="text-sm text-destructive py-8 text-center">{t('files.loadError')}</p>
-          )}
-          {!foldersQuery.isPending && !filesQuery.isPending && folders.length === 0 && files.length === 0 && (
-            <div className="py-12 text-center">
-              <p className="text-sm text-muted-foreground">{t('files.empty')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('files.emptyHint')}</p>
+          {isSearching ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  {t('files.searchResults', { query: activeSearch, count: searchFiles.length })}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setActiveSearch('')
+                    setSearchInput('')
+                  }}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  {t('files.clearSearch')}
+                </Button>
+              </div>
+              {searchQuery.isPending && (
+                <p className="text-sm text-muted-foreground py-8 text-center">...</p>
+              )}
+              {searchQuery.isError && (
+                <p className="text-sm text-destructive py-8 text-center">{t('files.loadError')}</p>
+              )}
+              {searchQuery.isSuccess && searchFiles.length === 0 && (
+                <p className="text-sm text-muted-foreground py-12 text-center">
+                  {t('files.noSearchResults', { query: activeSearch })}
+                </p>
+              )}
+              <FileList
+                viewMode={viewMode}
+                folders={[]}
+                files={searchFiles}
+                fileStores={{}}
+                onOpenFolder={handleNav}
+                onOpenFile={(file) => navigate(`/app/files/preview/${file.id}`, { state: { file } })}
+                onContextMenu={handleContextMenu}
+                actions={actions}
+              />
             </div>
+          ) : (
+            <>
+              {(foldersQuery.isPending || filesQuery.isPending) && (
+                <p className="text-sm text-muted-foreground py-8 text-center">...</p>
+              )}
+              {(foldersQuery.isError || filesQuery.isError) && (
+                <p className="text-sm text-destructive py-8 text-center">{t('files.loadError')}</p>
+              )}
+              {!foldersQuery.isPending && !filesQuery.isPending && folders.length === 0 && files.length === 0 && (
+                <div className="py-12 text-center">
+                  <p className="text-sm text-muted-foreground">{t('files.empty')}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('files.emptyHint')}</p>
+                </div>
+              )}
+              <FileList
+                viewMode={viewMode}
+                folders={folders}
+                files={files}
+                fileStores={fileStores}
+                onOpenFolder={handleNav}
+                onOpenFile={(file) => navigate(`/app/files/preview/${file.id}`, { state: { file } })}
+                onContextMenu={handleContextMenu}
+                actions={actions}
+              />
+            </>
           )}
-          <FileList
-            viewMode={viewMode}
-            folders={folders}
-            files={files}
-            fileStores={fileStores}
-            onOpenFolder={handleNav}
-            onOpenFile={(file) => navigate(`/app/files/preview/${file.id}`, { state: { file } })}
-            onContextMenu={handleContextMenu}
-            actions={actions}
-          />
         </CardContent>
       </Card>
 
@@ -437,6 +513,7 @@ export default function FilesPage() {
         setMoveFolderId={setMoveFolderId}
         moveItemPending={moveItem.isPending}
         onMoveSubmit={() => moveTarget && moveItem.mutate({ item: moveTarget, folderId: moveFolderId })}
+        orgSlug={orgSlug ?? ''}
         tagTarget={tagTarget}
         setTagTarget={setTagTarget}
         selectedTagIds={selectedTagIds}

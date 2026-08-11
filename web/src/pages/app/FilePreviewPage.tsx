@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { useLocation, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { tenantApi } from '@/lib/api'
 import type { LockerFile, Tag } from '@/lib/types'
 import { useOrgStore } from '@/store/org'
@@ -31,12 +31,17 @@ const isPreviewableImage = (mimeType: string) => mimeType.startsWith('image/')
 export default function FilePreviewPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const location = useLocation()
   const { fileId = '' } = useParams()
   const currentOrg = useOrgStore((s) => s.currentOrg)
   const orgSlug = currentOrg?.slug
-  const file = (location.state as { file?: LockerFile } | null)?.file
   const [previewUrl, setPreviewUrl] = useState('')
+
+  const fileQuery = useQuery({
+    queryKey: ['t', 'files', fileId, 'single', orgSlug],
+    queryFn: () => tenantApi<{ file: LockerFile }>(`/api/t/files/${fileId}`, orgSlug!),
+    enabled: !!orgSlug && !!fileId,
+  })
+  const file = fileQuery.data?.file
 
   const tagsQuery = useQuery({
     queryKey: ['t', 'files', fileId, 'tags', orgSlug],
@@ -46,7 +51,7 @@ export default function FilePreviewPage() {
         orgSlug!,
         { method: 'POST', body: JSON.stringify({ fileIds: [fileId] }) },
       ),
-    enabled: !!orgSlug && !!fileId && !!file,
+    enabled: !!orgSlug && !!fileId && !!fileQuery.data,
   })
 
   const downloadUrl = useMutation({
@@ -65,7 +70,26 @@ export default function FilePreviewPage() {
     })
   }
 
-  if (!file) {
+  if (fileQuery.isPending) {
+    return (
+      <div className="mx-auto w-full max-w-2xl space-y-6 p-6">
+        <Button variant="outline" onClick={() => navigate('/app/files')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          {t('files.back')}
+        </Button>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t('app.loading')}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (fileQuery.isError || !file) {
     return (
       <div className="mx-auto w-full max-w-2xl space-y-6 p-6">
         <Button variant="outline" onClick={() => navigate('/app/files')}>

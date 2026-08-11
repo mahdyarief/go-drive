@@ -25,6 +25,11 @@ export interface TagsData {
   tags: Tag[]
 }
 
+export interface SearchResultsData {
+  files: LockerFile[]
+  tags?: Record<string, Tag[]>
+}
+
 export type ViewMode = 'list' | 'grid'
 
 export const VIEW_MODE_KEY = 'filesViewMode'
