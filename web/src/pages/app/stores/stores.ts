@@ -1,3 +1,4 @@
+import { Cloud, Database, HardDrive } from 'lucide-react'
 import { useOrgStore } from '@/store/org'
 import type { ReplicationRun, S3Key, Store } from '@/lib/types'
 
@@ -31,6 +32,24 @@ export function bytesToGB(bytes: number): number {
 // localStorage key used to notify other tabs when a Google Drive connect
 // completes in the OAuth tab (the `storage` event fires in every other tab).
 export const GDRIVE_CONNECTED_KEY = 'gdrive:connected'
+
+// providerLabel returns the translated name for a store provider. Shared by
+// StoreCard (per-card badge) and StoreGroups (section headers) so they can
+// never drift apart.
+export function providerLabel(t: (key: string) => string, provider: string): string {
+  if (provider === 'local') return t('stores.providerLocal')
+  if (provider === 's3') return t('stores.providerS3')
+  if (provider === 'gdrive') return t('stores.providerGdrive')
+  return provider
+}
+
+// PROVIDER_ICONS maps each provider to its lucide icon. Shared by StoreCard
+// (row icon) and StoreGroups (section header) so they can never drift apart.
+export const PROVIDER_ICONS = {
+  gdrive: Cloud,
+  s3: Database,
+  local: HardDrive,
+} as const
 
 export interface StoresData {
   stores: Store[]

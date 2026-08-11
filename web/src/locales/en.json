@@ -464,6 +464,7 @@
     "testConnection": "Test Connection",
     "triggerIngest": "Trigger Ingest",
     "deleteStore": "Delete",
+    "moreActions": "Store actions",
     "noStores": "No stores attached yet.",
     "noStoresHint": "Attach your first storage backend to start storing files.",
     "providerLocal": "Local",

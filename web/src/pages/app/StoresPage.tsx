@@ -24,7 +24,7 @@ import type {
   WriteMode,
   IngestMode,
 } from './stores/stores'
-import { StoreCard } from './stores/StoreCard'
+import { StoreGroups } from './stores/StoreGroups'
 import { S3KeysCard } from './stores/S3KeysCard'
 import { StoreFormDialog } from './stores/StoreFormDialog'
 
@@ -249,25 +249,20 @@ export default function StoresPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {stores.map((store) => (
-          <StoreCard
-            key={store.id}
-            store={store}
-            primaryStoreId={primaryStoreId}
-            onEdit={openEdit}
-            onGdriveConnect={handleGdriveConnect}
-            gdriveAuthPending={gdriveAuth.isPending}
-            onSetPrimary={(id) => setPrimary.mutate(id)}
-            setPrimaryPending={setPrimary.isPending}
-            onTest={(id) => testStore.mutate(id)}
-            testPending={testStore.isPending}
-            onIngest={(id) => triggerIngest.mutate(id)}
-            ingestPending={triggerIngest.isPending}
-            onDelete={setDeleteTarget}
-          />
-        ))}
-      </div>
+      <StoreGroups
+        stores={stores}
+        primaryStoreId={primaryStoreId}
+        onEdit={openEdit}
+        onGdriveConnect={handleGdriveConnect}
+        gdriveAuthPending={gdriveAuth.isPending}
+        onSetPrimary={(id) => setPrimary.mutate(id)}
+        setPrimaryPending={setPrimary.isPending}
+        onTest={(id) => testStore.mutate(id)}
+        testPending={testStore.isPending}
+        onIngest={(id) => triggerIngest.mutate(id)}
+        ingestPending={triggerIngest.isPending}
+        onDelete={setDeleteTarget}
+      />
 
       <Card>
         <CardHeader className="pb-3">

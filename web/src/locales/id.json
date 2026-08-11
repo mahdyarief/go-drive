@@ -464,6 +464,7 @@
     "testConnection": "Uji Koneksi",
     "triggerIngest": "Jalankan Ingest",
     "deleteStore": "Hapus",
+    "moreActions": "Aksi penyimpanan",
     "noStores": "Belum ada penyimpanan.",
     "noStoresHint": "Tambahkan backend penyimpanan pertama untuk mulai menyimpan file.",
     "providerLocal": "Lokal",
