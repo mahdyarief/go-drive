@@ -17,6 +17,8 @@ interface StoreGroupsProps {
   setPrimaryPending: boolean
   onTest: (storeId: string) => void
   testPending: boolean
+  onRefreshQuota: (storeId: string) => void
+  refreshQuotaPending: boolean
   onIngest: (storeId: string) => void
   ingestPending: boolean
   onDelete: (store: Store) => void
@@ -37,6 +39,8 @@ export function StoreGroups({
   setPrimaryPending,
   onTest,
   testPending,
+  onRefreshQuota,
+  refreshQuotaPending,
   onIngest,
   ingestPending,
   onDelete,
@@ -94,6 +98,8 @@ export function StoreGroups({
                     setPrimaryPending={setPrimaryPending}
                     onTest={onTest}
                     testPending={testPending}
+                    onRefreshQuota={onRefreshQuota}
+                    refreshQuotaPending={refreshQuotaPending}
                     onIngest={onIngest}
                     ingestPending={ingestPending}
                     onDelete={onDelete}

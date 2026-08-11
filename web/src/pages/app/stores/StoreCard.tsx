@@ -21,6 +21,8 @@ interface StoreCardProps {
   setPrimaryPending: boolean
   onTest: (storeId: string) => void
   testPending: boolean
+  onRefreshQuota: (storeId: string) => void
+  refreshQuotaPending: boolean
   onIngest: (storeId: string) => void
   ingestPending: boolean
   onDelete: (store: Store) => void
@@ -39,6 +41,8 @@ export function StoreCard({
   setPrimaryPending,
   onTest,
   testPending,
+  onRefreshQuota,
+  refreshQuotaPending,
   onIngest,
   ingestPending,
   onDelete,
@@ -95,10 +99,10 @@ export function StoreCard({
           </div>
         </div>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={t('stores.moreActions')}>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={t('stores.moreActions')} />}
+          >
+            <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-44">
             <DropdownMenuItem onClick={() => onEdit(store)}>
@@ -120,6 +124,10 @@ export function StoreCard({
             <DropdownMenuItem disabled={testPending} onClick={() => onTest(store.id)}>
               <Check className="h-4 w-4 mr-2" />
               {t('stores.testConnection')}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={refreshQuotaPending} onClick={() => onRefreshQuota(store.id)}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {t('stores.refreshQuota')}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={ingestPending} onClick={() => onIngest(store.id)}>
               <Zap className="h-4 w-4 mr-2" />
@@ -153,6 +161,13 @@ export function StoreCard({
             )
           })}
         </div>
+      )}
+      {store.provider === 'gdrive' && store.provider_quota_limit > 0 && (
+        <p className="mt-1 text-[11px] text-muted-foreground/70">
+          {store.provider_quota_measured_at
+            ? t('stores.quotaMeasuredAt', { time: new Date(store.provider_quota_measured_at).toLocaleString() })
+            : t('stores.quotaNotMeasured')}
+        </p>
       )}
     </div>
   )

@@ -168,6 +168,20 @@ export default function StoresPage() {
     },
   })
 
+  // refreshQuota reuses the test endpoint — it re-fetches st.Quota() and
+  // stamps provider_quota_measured_at — but with a quota-specific toast so
+  // users can force-live the drive bar after uploads/deletes.
+  const refreshQuota = useMutation({
+    mutationFn: (id: string) => tenantApi<TestStoreData>(`/api/t/stores/${id}/test`, orgSlug!, { method: 'POST' }),
+    onSuccess: () => {
+      toast.success(t('stores.quotaRefreshed'))
+      invalidateStores()
+    },
+    onError: () => {
+      toast.error(t('stores.quotaRefreshFailed'))
+    },
+  })
+
   const setPrimary = useMutation({
     mutationFn: (id: string) => tenantApi<unknown>(`/api/t/stores/${id}/primary`, orgSlug!, { method: 'POST' }),
     onSuccess: invalidateStores,
@@ -259,6 +273,8 @@ export default function StoresPage() {
         setPrimaryPending={setPrimary.isPending}
         onTest={(id) => testStore.mutate(id)}
         testPending={testStore.isPending}
+        onRefreshQuota={(id) => refreshQuota.mutate(id)}
+        refreshQuotaPending={refreshQuota.isPending}
         onIngest={(id) => triggerIngest.mutate(id)}
         ingestPending={triggerIngest.isPending}
         onDelete={setDeleteTarget}
