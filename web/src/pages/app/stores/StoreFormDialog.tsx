@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { ExternalLink, HelpCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { StoreForm, Provider } from './stores'
+import type { IngestMode, Provider, StoreForm, WriteMode } from './stores'
 
 interface StoreFormDialogProps {
   orgSlug: string | undefined
@@ -216,7 +216,7 @@ export function StoreFormDialog(props: StoreFormDialogProps) {
 
             <div className="space-y-2">
               <Label>{t('stores.writeMode')}</Label>
-              <Select value={form.writeMode} onValueChange={(v) => setForm({ ...form, writeMode: v })}>
+              <Select value={form.writeMode} onValueChange={(v) => setForm({ ...form, writeMode: v as WriteMode })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -230,7 +230,7 @@ export function StoreFormDialog(props: StoreFormDialogProps) {
 
             <div className="space-y-2">
               <Label>{t('stores.ingestMode')}</Label>
-              <Select value={form.ingestMode} onValueChange={(v) => setForm({ ...form, ingestMode: v })}>
+              <Select value={form.ingestMode} onValueChange={(v) => setForm({ ...form, ingestMode: v as IngestMode })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

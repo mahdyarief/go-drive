@@ -7,10 +7,9 @@ import type { Store } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Check, Database, Loader2, Pencil, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
+import { Database, Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   GDRIVE_CONNECTED_KEY,
@@ -22,10 +21,12 @@ import {
   TriggerSyncData,
   GDriveCompleteData,
   Provider,
+  WriteMode,
+  IngestMode,
   bytesToGB,
-  formatBytes,
   useOrgSlug,
 } from './stores/stores'
+import { StoreCard } from './stores/StoreCard'
 import { S3KeysCard } from './stores/S3KeysCard'
 import { StoreFormDialog } from './stores/StoreFormDialog'
 
@@ -203,8 +204,8 @@ export default function StoresPage() {
     setForm({
       name: store.name,
       provider: store.provider as Provider,
-      writeMode: store.write_mode,
-      ingestMode: store.ingest_mode,
+      writeMode: store.write_mode as WriteMode,
+      ingestMode: store.ingest_mode as IngestMode,
       readPriority: store.read_priority,
       quotaLimit: Math.round(bytesToGB(store.quota_limit)),
       config: { ...(store.config as Record<string, string>) },
@@ -212,13 +213,6 @@ export default function StoresPage() {
     })
     setEditTarget(store)
     setCreateOpen(true)
-  }
-
-  const providerLabel = (p: string) => {
-    if (p === 'local') return t('stores.providerLocal')
-    if (p === 's3') return t('stores.providerS3')
-    if (p === 'gdrive') return t('stores.providerGdrive')
-    return p
   }
 
   return (
@@ -258,116 +252,21 @@ export default function StoresPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {stores.map((store) => (
-          <Card key={store.id}>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Database className="h-4 w-4 text-muted-foreground" />
-                <span className="truncate">{store.name}</span>
-                {store.provider === 'gdrive' && store.status === 'active' && (
-                  <Badge variant="outline" className="gap-1 border-emerald-600/30 bg-emerald-600/10 text-emerald-700">
-                    <Check className="h-3 w-3" />
-                    {t('stores.connected')}
-                  </Badge>
-                )}
-                {store.provider === 'gdrive' && store.status === 'pending' && (
-                  <Badge variant="outline" className="gap-1 border-amber-500/30 bg-amber-500/10 text-amber-700">
-                    {t('stores.pending')}
-                  </Badge>
-                )}
-                {store.provider === 'gdrive' && store.status === 'error' && (
-                  <Badge variant="destructive" className="gap-1">
-                    {t('stores.error')}
-                  </Badge>
-                )}
-                {store.id === primaryStoreId && (
-                  <Badge className="gap-1">
-                    <Star className="h-3 w-3" />
-                    {t('stores.primary')}
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                <Badge variant="secondary">{providerLabel(store.provider)}</Badge>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <dl className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <dt className="text-muted-foreground">{t('stores.status')}</dt>
-                  <dd className="capitalize">{store.status}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{t('stores.writeMode')}</dt>
-                  <dd>{store.write_mode}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{t('stores.ingestMode')}</dt>
-                  <dd>{store.ingest_mode}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{t('stores.readPriority')}</dt>
-                  <dd>{store.read_priority}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">{t('stores.storageLimit')}</dt>
-                  <dd>{store.quota_limit > 0 ? formatBytes(store.quota_limit) : t('stores.unlimited')}</dd>
-                </div>
-                {store.provider === 'local' && !!store.config?.baseDir && (
-                  <div className="col-span-2">
-                    <dt className="text-muted-foreground">{t('stores.folderLocation')}</dt>
-                    <dd className="font-mono text-[11px] break-all">{String(store.config.baseDir)}</dd>
-                  </div>
-                )}
-              </dl>
-
-              {store.quota_limit > 0 && store.status === 'active' && (
-                <div className="space-y-1">
-                  <Progress
-                    value={store.quota_limit > 0 ? Math.min(100, (store.quota_used / store.quota_limit) * 100) : 0}
-                    className="h-2"
-                  />
-                  {store.quota_limit > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {t('stores.quotaUsage', {
-                        used: formatBytes(store.quota_used),
-                        limit: formatBytes(store.quota_limit),
-                      })}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => openEdit(store)}>
-                  <Pencil className="h-3 w-3 mr-1" />
-                  {t('stores.editStore')}
-                </Button>
-                {store.provider === 'gdrive' && store.status !== 'active' && (
-                  <Button variant="outline" size="sm" disabled={gdriveAuth.isPending} onClick={() => handleGdriveConnect(store.id)}>
-                    {gdriveAuth.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                    {t('stores.connectGoogle')}
-                  </Button>
-                )}
-                {store.id !== primaryStoreId && (
-                  <Button variant="outline" size="sm" disabled={setPrimary.isPending} onClick={() => setPrimary.mutate(store.id)}>
-                    <Star className="h-3 w-3 mr-1" />
-                    {t('stores.setPrimary')}
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" disabled={testStore.isPending} onClick={() => testStore.mutate(store.id)}>
-                  {testStore.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
-                  {t('stores.testConnection')}
-                </Button>
-                <Button variant="outline" size="sm" disabled={triggerIngest.isPending} onClick={() => triggerIngest.mutate(store.id)}>
-                  {t('stores.triggerIngest')}
-                </Button>
-                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleteTarget(store)}>
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  {t('stores.deleteStore')}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <StoreCard
+            key={store.id}
+            store={store}
+            primaryStoreId={primaryStoreId}
+            onEdit={openEdit}
+            onGdriveConnect={handleGdriveConnect}
+            gdriveAuthPending={gdriveAuth.isPending}
+            onSetPrimary={(id) => setPrimary.mutate(id)}
+            setPrimaryPending={setPrimary.isPending}
+            onTest={(id) => testStore.mutate(id)}
+            testPending={testStore.isPending}
+            onIngest={(id) => triggerIngest.mutate(id)}
+            ingestPending={triggerIngest.isPending}
+            onDelete={setDeleteTarget}
+          />
         ))}
       </div>
 

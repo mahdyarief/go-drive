@@ -581,6 +581,7 @@
     "s3ConnectAiAgent": "AI agent integration prompt",
     "s3ConnectAiAgentNote": "Copy the prompt below and send it to your AI agent so it can integrate with this workspace's S3 gateway.",
     "s3ConnectCopyAiPrompt": "Copy AI Prompt",
+    "copyFailed": "Failed to copy to clipboard",
     "permissionReadwrite": "Read/Write",
     "permissionReadonly": "Read-only",
     "loadError": "Failed to load stores.",

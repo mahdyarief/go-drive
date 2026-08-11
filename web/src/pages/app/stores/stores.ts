@@ -10,19 +10,22 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-export function copyText(text: string) {
-  void navigator.clipboard.writeText(text)
+// copyText copies to the clipboard and resolves true on success so callers can
+// show feedback when the browser blocks the write (permissions, non-secure
+// context).
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
 }
 
 // bytesToGB converts a byte count to gigabytes for the quota input field.
 export function bytesToGB(bytes: number): number {
   if (!Number.isFinite(bytes) || bytes <= 0) return 0
   return bytes / 1024 ** 3
-}
-
-// emptyForm returns a fresh create-store form state.
-export function emptyForm(): StoreForm {
-  return { name: '', provider: 'local', writeMode: 'write', ingestMode: 'none', readPriority: 100, quotaLimit: 0, config: {}, credentials: {} }
 }
 
 // localStorage key used to notify other tabs when a Google Drive connect
@@ -66,11 +69,15 @@ export interface CreateKeyData {
 
 export type Provider = 'local' | 's3' | 'gdrive'
 
+export type WriteMode = 'write' | 'writeonly' | 'none'
+
+export type IngestMode = 'none' | 'poll' | 'webhook'
+
 export interface StoreForm {
   name: string
   provider: Provider
-  writeMode: string
-  ingestMode: string
+  writeMode: WriteMode
+  ingestMode: IngestMode
   readPriority: number
   quotaLimit: number // GB
   config: Record<string, string>

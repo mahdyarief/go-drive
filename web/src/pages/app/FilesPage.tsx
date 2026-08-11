@@ -3,111 +3,28 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { tenantApi } from '@/lib/api'
-import type { BreadcrumbItem, FileStoreInfo, Folder, LockerFile, ShareLink, StorageUsage, Tag } from '@/lib/types'
-import { Badge } from '@/components/ui/badge'
+import type { Folder, LockerFile, ShareLink, StorageUsage, Tag } from '@/lib/types'
 import { useOrgStore } from '@/store/org'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { Breadcrumb, BreadcrumbItem as BCItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
+import { HardDrive, LayoutGrid, List, Plus, Upload } from 'lucide-react'
 import {
-  Breadcrumb,
-  BreadcrumbItem as BCItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
-  Check,
-  Copy,
-  Download,
-  Eye,
-  File as FileIcon,
-  Folder as FolderIcon,
-  FolderInput,
-  HardDrive,
-  LayoutGrid,
-  List,
-  Loader2,
-  MoreVertical,
-  Pencil,
-  Plus,
-  Share2,
-  Tag as TagIcon,
-  Trash2,
-  Upload,
-} from 'lucide-react'
-
-interface FileListData {
-  files: LockerFile[]
-  tags?: Record<string, Tag[]>
-  stores?: Record<string, FileStoreInfo[]>
-  total: number
-  page: number
-  pageSize: number
-}
-
-interface FolderListData {
-  folders: Folder[]
-}
-
-interface BreadcrumbsData {
-  breadcrumbs: BreadcrumbItem[]
-}
-
-interface DownloadUrlData {
-  url: string
-}
-
-interface TagsData {
-  tags: Tag[]
-}
-
-type ViewMode = 'list' | 'grid'
-
-const VIEW_MODE_KEY = 'filesViewMode'
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
-}
-
-interface ItemField {
-  id: string
-  name: string
-  isFolder: boolean
-  file?: LockerFile
-}
-
-const copyToClipboard = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text)
-  } catch {
-    // Clipboard access can be blocked in embedded contexts; ignore.
-  }
-}
+  BreadcrumbsData,
+  DownloadUrlData,
+  FileListData,
+  FolderListData,
+  ItemActions,
+  ItemField,
+  TagsData,
+  ViewMode,
+  VIEW_MODE_KEY,
+  copyToClipboard,
+  formatBytes,
+} from './files/files'
+import { FileDialogs } from './files/FileDialogs'
+import { FileList } from './files/FileList'
 
 export default function FilesPage() {
   const { t } = useTranslation()
@@ -350,145 +267,29 @@ export default function FilesPage() {
       ? `${window.location.origin}/shared/${createShareLink.data.link.token}`
       : ''
 
-  const renderItemActions = (item: ItemField) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={t('files.open')}>
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {!item.isFolder && (
-          <DropdownMenuItem
-            onClick={() => navigate(`/app/files/preview/${item.id}`, { state: { file: item.file } })}
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            {t('files.preview')}
-          </DropdownMenuItem>
-        )}
-        {!item.isFolder && (
-          <DropdownMenuItem onClick={() => download.mutate(item.id)}>
-            <Download className="h-4 w-4 mr-2" />
-            {t('files.download')}
-          </DropdownMenuItem>
-        )}
-        {!item.isFolder && (
-          <DropdownMenuItem onClick={() => item.file && openTagDialog(item.file)}>
-            <TagIcon className="h-4 w-4 mr-2" />
-            {t('files.tags')}
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={() => handleShare(item)}>
-          <Share2 className="h-4 w-4 mr-2" />
-          {t('files.share')}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            setRenameTarget(item)
-            setRenameValue(item.name)
-          }}
-        >
-          <Pencil className="h-4 w-4 mr-2" />
-          {t('files.rename')}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            setMoveTarget(item)
-            setMoveFolderId('')
-          }}
-        >
-          <FolderInput className="h-4 w-4 mr-2" />
-          {t('files.move')}
-        </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onClick={() => setDeleteTarget(item)}>
-          <Trash2 className="h-4 w-4 mr-2" />
-          {t('files.delete')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
+  // Item actions shared by the per-row dropdown (FileItemActions) and the
+  // right-click context menu (FileDialogs).
+  const actions: ItemActions = {
+    onPreview: (item) => navigate(`/app/files/preview/${item.id}`, { state: { file: item.file } }),
+    onDownload: (item) => download.mutate(item.id),
+    onTags: (item) => item.file && openTagDialog(item.file),
+    onShare: (item) => handleShare(item),
+    onRename: (item) => {
+      setRenameTarget(item)
+      setRenameValue(item.name)
+    },
+    onMove: (item) => {
+      setMoveTarget(item)
+      setMoveFolderId('')
+    },
+    onDelete: (item) => setDeleteTarget(item),
+  }
 
-  const renderList = () => (
-    <ul className="divide-y divide-border">
-      {folders.map((folder) => (
-        <li
-          key={folder.id}
-          className="flex items-center gap-3 py-2"
-          onContextMenu={(e) => handleContextMenu(e, { id: folder.id, name: folder.name, isFolder: true })}
-        >
-          <button
-            type="button"
-            onClick={() => handleNav(folder.id)}
-            className="flex flex-1 items-center gap-3 text-left min-w-0"
-          >
-            <FolderIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="truncate text-sm font-medium">{folder.name}</span>
-          </button>
-          {renderItemActions({ id: folder.id, name: folder.name, isFolder: true })}
-        </li>
-      ))}
-      {files.map((file) => (
-        <li
-          key={file.id}
-          className="flex items-center gap-3 py-2"
-          onContextMenu={(e) => handleContextMenu(e, { id: file.id, name: file.name, isFolder: false, file })}
-        >
-          <button
-            type="button"
-            onClick={() => navigate(`/app/files/preview/${file.id}`, { state: { file } })}
-            className="flex flex-1 items-center gap-3 text-left min-w-0"
-          >
-            <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="truncate text-sm font-medium">{file.name}</span>
-            {(fileStores[file.id] ?? []).map((s) => (
-              <Badge key={s.id} variant="secondary" className="shrink-0 text-[10px]">
-                {s.name}
-              </Badge>
-            ))}
-            <span className="ml-auto text-xs text-muted-foreground shrink-0">
-              {formatBytes(file.size)}
-            </span>
-          </button>
-          {renderItemActions({ id: file.id, name: file.name, isFolder: false, file })}
-        </li>
-      ))}
-    </ul>
-  )
-
-  const renderGrid = () => (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {folders.map((folder) => (
-        <button
-          key={folder.id}
-          type="button"
-          onClick={() => handleNav(folder.id)}
-          onContextMenu={(e) => handleContextMenu(e, { id: folder.id, name: folder.name, isFolder: true })}
-          className="flex flex-col items-center gap-2 rounded-lg border p-4 hover:bg-accent"
-        >
-          <FolderIcon className="h-8 w-8 text-muted-foreground" />
-          <span className="w-full truncate text-center text-sm font-medium">{folder.name}</span>
-        </button>
-      ))}
-      {files.map((file) => (
-        <button
-          key={file.id}
-          type="button"
-          onClick={() => navigate(`/app/files/preview/${file.id}`, { state: { file } })}
-          onContextMenu={(e) => handleContextMenu(e, { id: file.id, name: file.name, isFolder: false, file })}
-          className="flex flex-col items-center gap-2 rounded-lg border p-4 hover:bg-accent"
-        >
-          <FileIcon className="h-8 w-8 text-muted-foreground" />
-          <span className="w-full truncate text-center text-sm font-medium">{file.name}</span>
-          <span className="text-xs text-muted-foreground">{formatBytes(file.size)}</span>
-          {(fileStores[file.id] ?? []).slice(0, 1).map((s) => (
-            <span key={s.id} className="text-[10px] text-muted-foreground">
-              {s.name}
-            </span>
-          ))}
-        </button>
-      ))}
-    </div>
-  )
+  const shareErrorMessage = createShareLink.isError
+    ? createShareLink.error instanceof Error
+      ? createShareLink.error.message
+      : t('files.actionError')
+    : null
 
   return (
     <div className="space-y-6">
@@ -584,7 +385,16 @@ export default function FilesPage() {
               <p className="text-xs text-muted-foreground mt-1">{t('files.emptyHint')}</p>
             </div>
           )}
-          {viewMode === 'grid' ? renderGrid() : renderList()}
+          <FileList
+            viewMode={viewMode}
+            folders={folders}
+            files={files}
+            fileStores={fileStores}
+            onOpenFolder={handleNav}
+            onOpenFile={(file) => navigate(`/app/files/preview/${file.id}`, { state: { file } })}
+            onContextMenu={handleContextMenu}
+            actions={actions}
+          />
         </CardContent>
       </Card>
 
@@ -614,343 +424,52 @@ export default function FilesPage() {
         </Card>
       )}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('files.newFolder')}</DialogTitle>
-            <DialogDescription>{t('files.folderName')}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="folder-name">{t('files.folderName')}</Label>
-              <Input
-                id="folder-name"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder={t('files.folderNamePlaceholder')}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              {t('links.cancel')}
-            </Button>
-            <Button
-              disabled={!newFolderName.trim() || createFolder.isPending}
-              onClick={() => createFolder.mutate(newFolderName.trim())}
-            >
-              {t('files.createFolder')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!renameTarget} onOpenChange={(o) => !o && setRenameTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('files.renameTitle')}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="rename-name">{t('files.folderName')}</Label>
-            <Input id="rename-name" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameTarget(null)}>
-              {t('links.cancel')}
-            </Button>
-            <Button
-              disabled={!renameValue.trim() || renameItem.isPending}
-              onClick={() => renameTarget && renameItem.mutate({ item: renameTarget, name: renameValue.trim() })}
-            >
-              {t('links.save')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!moveTarget} onOpenChange={(o) => !o && setMoveTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('files.moveTitle')}</DialogTitle>
-            <DialogDescription>{t('files.moveHint')}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="move-folder">{t('links.folderId')}</Label>
-            <Input
-              id="move-folder"
-              value={moveFolderId}
-              onChange={(e) => setMoveFolderId(e.target.value)}
-              placeholder="folderId"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMoveTarget(null)}>
-              {t('links.cancel')}
-            </Button>
-            <Button
-              disabled={moveItem.isPending}
-              onClick={() => moveTarget && moveItem.mutate({ item: moveTarget, folderId: moveFolderId })}
-            >
-              {t('links.save')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!tagTarget} onOpenChange={(o) => !o && setTagTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('files.manageTags')}</DialogTitle>
-            <DialogDescription>{tagTarget?.name}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="max-h-56 space-y-2 overflow-y-auto">
-              {allTags.length === 0 && (
-                <p className="text-sm text-muted-foreground">{t('files.noTags')}</p>
-              )}
-              {allTags.map((tag) => (
-                <label
-                  key={tag.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={selectedTagIds.includes(tag.id)}
-                    onChange={(e) => {
-                      setSelectedTagIds((prev) =>
-                        e.target.checked ? [...prev, tag.id] : prev.filter((id) => id !== tag.id),
-                      )
-                    }}
-                  />
-                  {tag.name}
-                </label>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                placeholder={t('files.newTagPlaceholder')}
-              />
-              <Button
-                variant="outline"
-                disabled={!newTagName.trim() || createTag.isPending}
-                onClick={() => createTag.mutate(newTagName.trim())}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {t('files.createTag')}
-              </Button>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTagTarget(null)}>
-              {t('links.cancel')}
-            </Button>
-            <Button
-              disabled={setFileTags.isPending}
-              onClick={() => tagTarget && setFileTags.mutate({ fileId: tagTarget.id, tagIds: selectedTagIds })}
-            >
-              {setFileTags.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              {t('links.save')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={!!shareTarget}
-        onOpenChange={(o) => {
-          if (!o) {
-            setShareTarget(null)
-            setCopied(false)
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('files.shareTitle')}</DialogTitle>
-            <DialogDescription>{t('files.shareHint')}</DialogDescription>
-          </DialogHeader>
-          {createShareLink.isPending ? (
-            <p className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {t('app.loading')}
-            </p>
-          ) : createShareLink.isError ? (
-            <p className="py-4 text-sm text-destructive">
-              {createShareLink.error instanceof Error
-                ? createShareLink.error.message
-                : t('files.actionError')}
-            </p>
-          ) : createShareLink.data ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-                <span className="flex-1 truncate font-mono text-xs">{shareUrl}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  aria-label={t('files.copyLink')}
-                  onClick={() => handleCopy(shareUrl)}
-                >
-                  {copied ? (
-                    <Check className="h-4 w-4 text-emerald-600" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              {copied && <p className="text-xs text-emerald-600">{t('files.copied')}</p>}
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShareTarget(null)
-                setCopied(false)
-              }}
-            >
-              {t('links.cancel')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('files.deleteTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget
-                ? deleteTarget.isFolder
-                  ? t('files.deleteConfirmFolder', { name: deleteTarget.name })
-                  : t('files.deleteConfirmFile', { name: deleteTarget.name })
-                : ''}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>
-              {t('links.cancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={deleteItem.isPending}
-              onClick={() => deleteTarget && deleteItem.mutate(deleteTarget)}
-            >
-              {t('files.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {contextMenu && (
-        <>
-          <button
-            type="button"
-            aria-label={t('links.cancel')}
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={() => setContextMenu(null)}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              setContextMenu(null)
-            }}
-          />
-          <div
-            className="fixed z-50 w-56 rounded-lg border bg-popover p-1 shadow-md"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-          >
-            {!contextMenu.item.isFolder && (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
-                onClick={() => {
-                  navigate(`/app/files/preview/${contextMenu.item.id}`, {
-                    state: { file: contextMenu.item.file },
-                  })
-                  setContextMenu(null)
-                }}
-              >
-                <Eye className="h-4 w-4" />
-                {t('files.preview')}
-              </button>
-            )}
-            {!contextMenu.item.isFolder && (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
-                onClick={() => {
-                  download.mutate(contextMenu.item.id)
-                  setContextMenu(null)
-                }}
-              >
-                <Download className="h-4 w-4" />
-                {t('files.download')}
-              </button>
-            )}
-            {!contextMenu.item.isFolder && (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
-                onClick={() => {
-                  if (contextMenu.item.file) openTagDialog(contextMenu.item.file)
-                  setContextMenu(null)
-                }}
-              >
-                <TagIcon className="h-4 w-4" />
-                {t('files.tags')}
-              </button>
-            )}
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
-              onClick={() => {
-                handleShare(contextMenu.item)
-                setContextMenu(null)
-              }}
-            >
-              <Share2 className="h-4 w-4" />
-              {t('files.share')}
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
-              onClick={() => {
-                setRenameTarget(contextMenu.item)
-                setRenameValue(contextMenu.item.name)
-                setContextMenu(null)
-              }}
-            >
-              <Pencil className="h-4 w-4" />
-              {t('files.rename')}
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
-              onClick={() => {
-                setMoveTarget(contextMenu.item)
-                setMoveFolderId('')
-                setContextMenu(null)
-              }}
-            >
-              <FolderInput className="h-4 w-4" />
-              {t('files.move')}
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-accent"
-              onClick={() => {
-                setDeleteTarget(contextMenu.item)
-                setContextMenu(null)
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              {t('files.delete')}
-            </button>
-          </div>
-        </>
-      )}
+      <FileDialogs
+        createOpen={createOpen}
+        setCreateOpen={setCreateOpen}
+        newFolderName={newFolderName}
+        setNewFolderName={setNewFolderName}
+        createFolderPending={createFolder.isPending}
+        onCreateFolder={() => createFolder.mutate(newFolderName.trim())}
+        renameTarget={renameTarget}
+        setRenameTarget={setRenameTarget}
+        renameValue={renameValue}
+        setRenameValue={setRenameValue}
+        renameItemPending={renameItem.isPending}
+        onRenameSubmit={() => renameTarget && renameItem.mutate({ item: renameTarget, name: renameValue.trim() })}
+        moveTarget={moveTarget}
+        setMoveTarget={setMoveTarget}
+        moveFolderId={moveFolderId}
+        setMoveFolderId={setMoveFolderId}
+        moveItemPending={moveItem.isPending}
+        onMoveSubmit={() => moveTarget && moveItem.mutate({ item: moveTarget, folderId: moveFolderId })}
+        tagTarget={tagTarget}
+        setTagTarget={setTagTarget}
+        selectedTagIds={selectedTagIds}
+        setSelectedTagIds={setSelectedTagIds}
+        newTagName={newTagName}
+        setNewTagName={setNewTagName}
+        allTags={allTags}
+        createTagPending={createTag.isPending}
+        onCreateTag={() => createTag.mutate(newTagName.trim())}
+        setFileTagsPending={setFileTags.isPending}
+        onSaveTags={() => tagTarget && setFileTags.mutate({ fileId: tagTarget.id, tagIds: selectedTagIds })}
+        shareTarget={shareTarget}
+        setShareTarget={setShareTarget}
+        copied={copied}
+        setCopied={setCopied}
+        shareUrl={shareUrl}
+        sharePending={createShareLink.isPending}
+        shareErrorMessage={shareErrorMessage}
+        onCopyShare={() => handleCopy(shareUrl)}
+        deleteTarget={deleteTarget}
+        setDeleteTarget={setDeleteTarget}
+        deleteItemPending={deleteItem.isPending}
+        onDeleteSubmit={() => deleteTarget && deleteItem.mutate(deleteTarget)}
+        contextMenu={contextMenu}
+        setContextMenu={setContextMenu}
+        actions={actions}
+      />
     </div>
   )
 }

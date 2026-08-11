@@ -13,3 +13,6 @@ data/
 # Google service account private keys (never commit)
 stoked-elixir-504705-f1-*.json
 leafy-analyst-504705-u2-*.json
+# Scratch lint/tsc output files
+lint-*.txt
+tsc-*.txt

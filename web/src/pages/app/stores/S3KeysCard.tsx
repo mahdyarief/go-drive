@@ -21,11 +21,36 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { HelpCircle, KeyRound, Loader2, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { CreateKeyData, KeysData, copyText } from './stores'
 
 interface S3KeysCardProps {
   orgSlug: string | undefined
   s3Endpoint: string
+}
+
+// buildAiPrompt is the single source of truth for the AI agent integration
+// block — used both by the rendered <pre> and the copy button so they can
+// never drift apart.
+function buildAiPrompt(s3Endpoint: string): string {
+  return `S3 endpoint: ${s3Endpoint}
+Access key ID: <your access key>
+Secret access key: <your secret>
+Region: us-east-1
+Auth: AWS SigV4
+
+Supported operations: ListObjectsV2 (list + prefix), GetObject,
+HeadObject, PutObject (folders auto-created via key path), DeleteObject,
+multipart upload (CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
+AbortMultipartUpload, ListParts, ListMultipartUploads).
+
+To use with AWS CLI:
+aws --endpoint-url ${s3Endpoint} s3 ls s3://
+aws --endpoint-url ${s3Endpoint} s3 cp file.txt s3://hello.txt
+
+To use with rclone: type=s3, provider=Other, endpoint=${s3Endpoint}.
+Note: in development use the API port :8081, not the Vite proxy :5173
+(the proxy rewrites Host and breaks SigV4).`
 }
 
 // S3KeysCard renders the S3 API keys card plus its dialogs (create key, key
@@ -74,26 +99,16 @@ export function S3KeysCard({ orgSlug, s3Endpoint }: S3KeysCardProps) {
 
   // copyAiPrompt copies a ready-to-send instruction block so the user can
   // paste it into their AI agent to integrate with the S3 gateway.
-  const copyAiPrompt = () => {
-    const prompt = `S3 endpoint: ${s3Endpoint}
-Access key ID: <your access key>
-Secret access key: <your secret>
-Region: us-east-1
-Auth: AWS SigV4
+  const copyAiPrompt = async () => {
+    const ok = await copyText(buildAiPrompt(s3Endpoint))
+    if (!ok) toast.error(t('stores.copyFailed'))
+  }
 
-Supported operations: ListObjectsV2 (list + prefix), GetObject,
-HeadObject, PutObject (folders auto-created via key path), DeleteObject,
-multipart upload (CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
-AbortMultipartUpload, ListParts, ListMultipartUploads).
-
-To use with AWS CLI:
-aws --endpoint-url ${s3Endpoint} s3 ls s3://
-aws --endpoint-url ${s3Endpoint} s3 cp file.txt s3://hello.txt
-
-To use with rclone: type=s3, provider=Other, endpoint=${s3Endpoint}.
-Note: in development use the API port :8081, not the Vite proxy :5173
-(the proxy rewrites Host and breaks SigV4).`
-    copyText(prompt)
+  // copyWithFeedback copies text and reports a failure toast when the
+  // clipboard write is blocked by the browser.
+  const copyWithFeedback = async (text: string) => {
+    const ok = await copyText(text)
+    if (!ok) toast.error(t('stores.copyFailed'))
   }
 
   return (
@@ -188,7 +203,7 @@ Note: in development use the API port :8081, not the Vite proxy :5173
                 <Label>{t('stores.accessKeyId')}</Label>
                 <div className="flex gap-2">
                   <Input readOnly value={keyCreatedData.accessKeyId} />
-                  <Button variant="outline" onClick={() => copyText(keyCreatedData.accessKeyId)}>
+                  <Button variant="outline" onClick={() => void copyWithFeedback(keyCreatedData.accessKeyId)}>
                     {t('stores.copyAccessKey')}
                   </Button>
                 </div>
@@ -197,7 +212,7 @@ Note: in development use the API port :8081, not the Vite proxy :5173
                 <Label>{t('stores.secretAccessKey')}</Label>
                 <div className="flex gap-2">
                   <Input readOnly value={keyCreatedData.secretAccessKey} />
-                  <Button variant="outline" onClick={() => copyText(keyCreatedData.secretAccessKey)}>
+                  <Button variant="outline" onClick={() => void copyWithFeedback(keyCreatedData.secretAccessKey)}>
                     {t('stores.copySecret')}
                   </Button>
                 </div>
@@ -244,7 +259,7 @@ Note: in development use the API port :8081, not the Vite proxy :5173
               <Label>{t('stores.s3ConnectEndpoint')}</Label>
               <div className="flex gap-2">
                 <Input readOnly value={s3Endpoint} className="font-mono text-xs" />
-                <Button variant="outline" onClick={() => copyText(s3Endpoint)}>
+                <Button variant="outline" onClick={() => void copyWithFeedback(s3Endpoint)}>
                   {t('stores.s3ConnectCopyEndpoint')}
                 </Button>
               </div>
@@ -293,24 +308,7 @@ rclone copy <remote>:hello.txt ./`}</pre>
             <div className="space-y-2">
               <p className="font-medium">{t('stores.s3ConnectAiAgent')}</p>
               <p className="text-xs text-muted-foreground">{t('stores.s3ConnectAiAgentNote')}</p>
-              <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">{`S3 endpoint: ${s3Endpoint}
-Access key ID: <your access key>
-Secret access key: <your secret>
-Region: us-east-1
-Auth: AWS SigV4
-
-Supported operations: ListObjectsV2 (list + prefix), GetObject,
-HeadObject, PutObject (folders auto-created via key path), DeleteObject,
-multipart upload (CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
-AbortMultipartUpload, ListParts, ListMultipartUploads).
-
-To use with AWS CLI:
-aws --endpoint-url ${s3Endpoint} s3 ls s3://
-aws --endpoint-url ${s3Endpoint} s3 cp file.txt s3://hello.txt
-
-To use with rclone: type=s3, provider=Other, endpoint=${s3Endpoint}.
-Note: in development use the API port :8081, not the Vite proxy :5173
-(the proxy rewrites Host and breaks SigV4).`}</pre>
+              <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs">{buildAiPrompt(s3Endpoint)}</pre>
               <Button variant="outline" size="sm" onClick={() => copyAiPrompt()}>
                 {t('stores.s3ConnectCopyAiPrompt')}
               </Button>

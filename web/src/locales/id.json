@@ -581,6 +581,7 @@
     "s3ConnectAiAgent": "Prompt integrasi AI Agent",
     "s3ConnectAiAgentNote": "Salin prompt di bawah dan kirim ke AI Agent Anda agar dapat berintegrasi dengan gateway S3 workspace ini.",
     "s3ConnectCopyAiPrompt": "Salin Prompt AI",
+    "copyFailed": "Gagal menyalin ke clipboard",
     "permissionReadwrite": "Baca/Tulis",
     "permissionReadonly": "Hanya-baca",
     "loadError": "Gagal memuat penyimpanan.",
