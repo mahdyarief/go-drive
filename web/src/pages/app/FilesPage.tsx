@@ -6,12 +6,11 @@ import { tenantApi } from '@/lib/api'
 import type { Folder, LockerFile, ShareLink, StorageUsage, Tag } from '@/lib/types'
 import { useOrgStore } from '@/store/org'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumb, BreadcrumbItem as BCItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { HardDrive, LayoutGrid, List, Plus, Search, Upload, X } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { VIEW_MODE_KEY, copyToClipboard, formatBytes } from './files/files'
+import { X } from 'lucide-react'
+import { VIEW_MODE_KEY, copyToClipboard } from './files/files'
 import type {
   BreadcrumbsData,
   DownloadUrlData,
@@ -25,6 +24,9 @@ import type {
 } from './files/files'
 import { FileDialogs } from './files/FileDialogs'
 import { FileList } from './files/FileList'
+import { FileToolbar } from './files/FileToolbar'
+import { UploadProgressCard, type UploadProgress } from './files/UploadProgressCard'
+import { StorageUsageCard } from './files/StorageUsageCard'
 
 export default function FilesPage() {
   const { t } = useTranslation()
@@ -47,7 +49,7 @@ export default function FilesPage() {
   const [deleteTarget, setDeleteTarget] = useState<ItemField | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
-  const [uploadProgress, setUploadProgress] = useState<{ name: string; percent: number } | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: ItemField } | null>(null)
   const [tagTarget, setTagTarget] = useState<LockerFile | null>(null)
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
@@ -313,71 +315,19 @@ export default function FilesPage() {
           <h1 className="text-2xl font-bold tracking-tight">{t('files.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('files.description')}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <form
-            className="relative"
-            onSubmit={(e) => {
-              e.preventDefault()
-              setActiveSearch(searchInput.trim())
-            }}
-          >
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder={t('files.searchPlaceholder')}
-              className="w-56 pl-8"
-            />
-          </form>
-          <div className="flex items-center rounded-lg border p-0.5">
-            <Button
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-              size="icon"
-              className="h-8 w-8"
-              aria-label={t('files.listView')}
-              onClick={() => toggleView('list')}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-              size="icon"
-              className="h-8 w-8"
-              aria-label={t('files.gridView')}
-              onClick={() => toggleView('grid')}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button variant="outline" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t('files.newFolder')}
-          </Button>
-          <Button render={<label className="cursor-pointer flex items-center gap-1.5" />}>
-            <Upload className="h-4 w-4" />
-            {t('files.upload')}
-            <input
-              type="file"
-              className="hidden"
-              onChange={handleUpload}
-              disabled={uploadFiles.isPending}
-            />
-          </Button>
-        </div>
+        <FileToolbar
+          viewMode={viewMode}
+          onToggleView={toggleView}
+          searchValue={searchInput}
+          onSearchChange={setSearchInput}
+          onSearch={() => setActiveSearch(searchInput.trim())}
+          onNewFolder={() => setCreateOpen(true)}
+          onUpload={handleUpload}
+          uploadPending={uploadFiles.isPending}
+        />
       </div>
 
-      {uploadProgress && (
-        <Card>
-          <CardContent className="py-3 text-sm">
-            <p className="text-muted-foreground">
-              {t('files.uploadProgress', {
-                name: uploadProgress.name,
-                percent: uploadProgress.percent,
-              })}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <UploadProgressCard progress={uploadProgress} />
 
       <Card>
         <CardHeader className="pb-3">
@@ -468,31 +418,7 @@ export default function FilesPage() {
         </CardContent>
       </Card>
 
-      {usageQuery.isSuccess && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <HardDrive className="h-4 w-4" />
-              {t('files.storageUsed')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <p className="text-muted-foreground">
-              {formatBytes(usageQuery.data.used)} / {formatBytes(usageQuery.data.limit)}
-            </p>
-            <div className="mt-2 h-2 w-full rounded-full bg-muted">
-              <div
-                className="h-2 rounded-full bg-primary"
-                style={{ width: `${Math.min(usageQuery.data.percentage, 100)}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t('files.filesCount', { count: usageQuery.data.fileCount })} ·{' '}
-              {t('files.foldersCount', { count: usageQuery.data.folderCount })}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {usageQuery.isSuccess && <StorageUsageCard usage={usageQuery.data} />}
 
       <FileDialogs
         createOpen={createOpen}
