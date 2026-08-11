@@ -465,6 +465,8 @@
     "triggerIngest": "Trigger Ingest",
     "deleteStore": "Delete",
     "moreActions": "Store actions",
+    "driveQuota": "Drive quota",
+    "storageLimit": "Storage limit",
     "noStores": "No stores attached yet.",
     "noStoresHint": "Attach your first storage backend to start storing files.",
     "providerLocal": "Local",

@@ -35,7 +35,7 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 		// shows data without requiring a manual Test Connection.
 		for i := range stores {
 			s := &stores[i]
-			if s.Provider != "gdrive" || s.Status != "active" || s.QuotaLimit != 0 {
+			if s.Provider != "gdrive" || s.Status != "active" || s.ProviderQuotaLimit != 0 {
 				continue
 			}
 			st, err := store.BuildStorage(ctx, tx, s)
@@ -49,11 +49,11 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 			now := time.Now()
 			if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
 				Where("id = ?", s.ID).
-				Set("quota_used = ?", used, "quota_limit = ?", limit).
+				Set("quota_used = ?", used, "provider_quota_limit = ?", limit).
 				Set("last_tested_at = ?", now, "updated_at = ?", now).
 				Exec(ctx); err == nil {
 				s.QuotaUsed = used
-				s.QuotaLimit = limit
+				s.ProviderQuotaLimit = limit
 			}
 		}
 		var primaryID *uuid.UUID
@@ -328,7 +328,7 @@ func TestStore(db *bun.DB) gin.HandlerFunc {
 		now := time.Now()
 		if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
 			Set("last_tested_at = ?", now, "updated_at = ?", now).
-			Set("quota_used = ?", used, "quota_limit = ?", limit).
+			Set("quota_used = ?", used, "provider_quota_limit = ?", limit).
 			Where("id = ?", id).
 			Exec(ctx); err != nil {
 			Err(c, http.StatusInternalServerError, "updating store: "+err.Error())

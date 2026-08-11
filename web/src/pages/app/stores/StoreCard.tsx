@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { Store } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -47,6 +46,17 @@ export function StoreCard({
   const { t } = useTranslation()
   const Icon = PROVIDER_ICONS[store.provider as keyof typeof PROVIDER_ICONS] ?? Database
 
+  // quotaRows renders one bar per available quota: the provider's own capacity
+  // (e.g. Google Drive's 15 GB) and the app-configured storage limit. Each bar
+  // clamps at 100% and turns destructive when used > limit.
+  const quotaRows: { label: string; limit: number }[] = []
+  if (store.provider_quota_limit > 0) {
+    quotaRows.push({ label: t('stores.driveQuota'), limit: store.provider_quota_limit })
+  }
+  if (store.quota_limit > 0) {
+    quotaRows.push({ label: t('stores.storageLimit'), limit: store.quota_limit })
+  }
+
   return (
     <div className="rounded-lg border px-3 py-2">
       <div className="flex items-center justify-between gap-3">
@@ -80,7 +90,6 @@ export function StoreCard({
             </div>
             <p className="truncate text-xs text-muted-foreground">
               {providerLabel(t, store.provider)}
-              {store.quota_limit > 0 && ` · ${formatBytes(store.quota_used)} / ${formatBytes(store.quota_limit)}`}
               {store.write_mode !== 'none' && ` · ${store.write_mode}`}
             </p>
           </div>
@@ -123,8 +132,27 @@ export function StoreCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {store.quota_limit > 0 && store.status === 'active' && (
-        <Progress value={Math.min(100, (store.quota_used / store.quota_limit) * 100)} className="mt-2 h-1" />
+      {quotaRows.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {quotaRows.map((row) => {
+            const percent = Math.min(100, (store.quota_used / row.limit) * 100)
+            const over = store.quota_used > row.limit
+            return (
+              <div key={row.label} className="flex items-center gap-2">
+                <span className="w-24 shrink-0 truncate text-xs text-muted-foreground">{row.label}</span>
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full ${over ? 'bg-destructive' : 'bg-primary'}`}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+                <span className={`shrink-0 text-xs tabular-nums ${over ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {formatBytes(store.quota_used)} / {formatBytes(row.limit)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )

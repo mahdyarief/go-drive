@@ -465,6 +465,8 @@
     "triggerIngest": "Jalankan Ingest",
     "deleteStore": "Hapus",
     "moreActions": "Aksi penyimpanan",
+    "driveQuota": "Kuota Drive",
+    "storageLimit": "Batas penyimpanan",
     "noStores": "Belum ada penyimpanan.",
     "noStoresHint": "Tambahkan backend penyimpanan pertama untuk mulai menyimpan file.",
     "providerLocal": "Lokal",

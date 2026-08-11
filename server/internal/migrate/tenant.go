@@ -108,6 +108,7 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			config jsonb NOT NULL DEFAULT '',
 			quota_used bigint NOT NULL DEFAULT 0,
 			quota_limit bigint NOT NULL DEFAULT 0,
+			provider_quota_limit bigint NOT NULL DEFAULT 0,
 			last_tested_at timestamptz,
 			last_synced_at timestamptz,
 			created_at timestamptz NOT NULL DEFAULT now(),
@@ -393,6 +394,7 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 		queries = append(queries,
 			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS quota_used bigint NOT NULL DEFAULT 0`),
 			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS quota_limit bigint NOT NULL DEFAULT 0`),
+			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS provider_quota_limit bigint NOT NULL DEFAULT 0`),
 			q(`ALTER TABLE %sworkspace_storage_settings ADD COLUMN IF NOT EXISTS storage_mode text NOT NULL DEFAULT 'cumulative'`),
 		)
 	}
@@ -413,9 +415,23 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 		if err := sqliteEnsureColumn(ctx, db, "stores", "quota_limit", "quota_limit bigint NOT NULL DEFAULT 0"); err != nil {
 			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
 		}
+		if err := sqliteEnsureColumn(ctx, db, "stores", "provider_quota_limit", "provider_quota_limit bigint NOT NULL DEFAULT 0"); err != nil {
+			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
+		}
 		if err := sqliteEnsureColumn(ctx, db, "workspace_storage_settings", "storage_mode", "storage_mode text NOT NULL DEFAULT 'cumulative'"); err != nil {
 			return fmt.Errorf("adding column to %s.workspace_storage_settings: %w", schema, err)
 		}
+	}
+
+	// One-time data migration: GDrive stores previously stored the provider's
+	// reported capacity in quota_limit (TestStore / OAuth complete overwrote
+	// the user-configured storage limit). Move that value into
+	// provider_quota_limit so quota_limit only ever holds the app storage
+	// limit going forward.
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(
+		`UPDATE %sstores SET provider_quota_limit = quota_limit, quota_limit = 0
+		 WHERE provider = 'gdrive' AND provider_quota_limit = 0 AND quota_limit > 0`, prefix)); err != nil {
+		return fmt.Errorf("migrating gdrive quota columns in %s: %w", schema, err)
 	}
 
 	// Seed a ready-to-use local store so a fresh workspace can store files
