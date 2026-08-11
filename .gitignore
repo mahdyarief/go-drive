@@ -16,3 +16,5 @@ leafy-analyst-504705-u2-*.json
 # Scratch lint/tsc output files
 lint-*.txt
 tsc-*.txt
+# Agent-maintained project memory
+MEMORY.md

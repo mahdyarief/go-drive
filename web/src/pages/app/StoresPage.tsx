@@ -35,7 +35,8 @@ export default function StoresPage() {
   // S3 gateway endpoint for the connect guide. In development the app runs
   // on the Vite port (:5173), but the dev proxy rewrites the Host header
   // which breaks AWS SigV4 — so S3 clients must target the API port (:8081).
-  const serverBase = window.location.port === '5173' ? 'http://localhost:8081' : window.location.origin
+  const isDev = import.meta.env.DEV
+  const serverBase = isDev ? 'http://localhost:8081' : window.location.origin
   const s3Endpoint = `${serverBase}/api/s3/${orgSlug ?? ''}`
 
   const [createOpen, setCreateOpen] = useState(false)
@@ -333,7 +334,7 @@ export default function StoresPage() {
 
       <Separator />
 
-      <S3KeysCard orgSlug={orgSlug} s3Endpoint={s3Endpoint} />
+      <S3KeysCard orgSlug={orgSlug} s3Endpoint={s3Endpoint} isDev={isDev} />
 
       <StoreFormDialog
         orgSlug={orgSlug}
