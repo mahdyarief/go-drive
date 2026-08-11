@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumb, BreadcrumbItem as BCItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { HardDrive, LayoutGrid, List, Plus, Upload } from 'lucide-react'
-import {
+import { VIEW_MODE_KEY, copyToClipboard, formatBytes } from './files/files'
+import type {
   BreadcrumbsData,
   DownloadUrlData,
   FileListData,
@@ -19,9 +20,6 @@ import {
   ItemField,
   TagsData,
   ViewMode,
-  VIEW_MODE_KEY,
-  copyToClipboard,
-  formatBytes,
 } from './files/files'
 import { FileDialogs } from './files/FileDialogs'
 import { FileList } from './files/FileList'

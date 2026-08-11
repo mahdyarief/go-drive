@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { HelpCircle, KeyRound, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { CreateKeyData, KeysData, copyText } from './stores'
+import { copyText } from './stores'
+import type { CreateKeyData, KeysData } from './stores'
 
 interface S3KeysCardProps {
   orgSlug: string | undefined

@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { Database, Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  GDRIVE_CONNECTED_KEY,
+import { GDRIVE_CONNECTED_KEY, bytesToGB, useOrgSlug } from './stores/stores'
+import type {
   StoreForm,
   StoresData,
   TestStoreData,
@@ -23,8 +23,6 @@ import {
   Provider,
   WriteMode,
   IngestMode,
-  bytesToGB,
-  useOrgSlug,
 } from './stores/stores'
 import { StoreCard } from './stores/StoreCard'
 import { S3KeysCard } from './stores/S3KeysCard'
