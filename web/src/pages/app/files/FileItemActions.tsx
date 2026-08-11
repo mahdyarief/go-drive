@@ -21,10 +21,10 @@ export function FileItemActions({ item, actions }: FileItemActionsProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={t('files.open')}>
-          <MoreVertical className="h-4 w-4" />
-        </Button>
+      <DropdownMenuTrigger
+        render={<Button variant="ghost" size="icon" className="h-8 w-8" aria-label={t('files.open')} />}
+      >
+        <MoreVertical className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {!item.isFolder && (

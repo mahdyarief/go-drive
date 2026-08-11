@@ -379,7 +379,7 @@ export default function LinksPage() {
             {activeTab !== 'upload' && (
               <div className="space-y-2">
                 <Label htmlFor="l-access">{t('links.access')}</Label>
-                <Select value={form.access} onValueChange={(v) => setForm({ ...form, access: v })}>
+                <Select value={form.access} onValueChange={(v) => setForm({ ...form, access: v ?? 'view' })}>
                   <SelectTrigger id="l-access">
                     <SelectValue />
                   </SelectTrigger>

@@ -187,8 +187,8 @@ export function FileDialogs(props: FileDialogsProps) {
                     className="h-4 w-4"
                     checked={selectedTagIds.includes(tag.id)}
                     onChange={(e) => {
-                      setSelectedTagIds((prev) =>
-                        e.target.checked ? [...prev, tag.id] : prev.filter((id) => id !== tag.id),
+                      setSelectedTagIds(
+                        e.target.checked ? [...selectedTagIds, tag.id] : selectedTagIds.filter((id) => id !== tag.id),
                       )
                     }}
                   />

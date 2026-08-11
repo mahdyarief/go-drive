@@ -113,7 +113,7 @@ export default function SettingsMembersPage() {
                 {canChangeRoles && member.role !== 'owner' && (
                   <Select
                     value={member.role}
-                    onValueChange={(v) => changeRole.mutate({ memberUserId: member.user_id, role: v })}
+                    onValueChange={(v) => changeRole.mutate({ memberUserId: member.user_id, role: v ?? member.role })}
                   >
                     <SelectTrigger className="h-8 w-28" aria-label={t('settings.members.role')}>
                       <SelectValue />
@@ -160,7 +160,7 @@ export default function SettingsMembersPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="member-role">{t('settings.members.role')}</Label>
-              <Select value={newRole} onValueChange={setNewRole}>
+              <Select value={newRole} onValueChange={(v) => setNewRole(v ?? 'member')}>
                 <SelectTrigger id="member-role">
                   <SelectValue />
                 </SelectTrigger>

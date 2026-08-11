@@ -172,7 +172,7 @@ export function S3KeysCard({ orgSlug, s3Endpoint, isDev }: S3KeysCardProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="key-permissions">{t('stores.permissions')}</Label>
-              <Select value={keyPermissions} onValueChange={setKeyPermissions}>
+              <Select value={keyPermissions} onValueChange={(v) => setKeyPermissions(v ?? 'readwrite')}>
                 <SelectTrigger id="key-permissions">
                   <SelectValue />
                 </SelectTrigger>

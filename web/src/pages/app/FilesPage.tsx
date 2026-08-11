@@ -321,17 +321,15 @@ export default function FilesPage() {
             <Plus className="h-4 w-4 mr-2" />
             {t('files.newFolder')}
           </Button>
-          <Button asChild>
-            <label className="cursor-pointer flex items-center gap-1.5">
-              <Upload className="h-4 w-4" />
-              {t('files.upload')}
-              <input
-                type="file"
-                className="hidden"
-                onChange={handleUpload}
-                disabled={uploadFiles.isPending}
-              />
-            </label>
+          <Button render={<label className="cursor-pointer flex items-center gap-1.5" />}>
+            <Upload className="h-4 w-4" />
+            {t('files.upload')}
+            <input
+              type="file"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploadFiles.isPending}
+            />
           </Button>
         </div>
       </div>
@@ -354,10 +352,8 @@ export default function FilesPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BCItem>
-                <BreadcrumbLink asChild>
-                  <button type="button" onClick={() => handleNav(null)} className="text-sm">
-                    {t('files.root')}
-                  </button>
+                <BreadcrumbLink render={<button type="button" onClick={() => handleNav(null)} className="text-sm" />}>
+                  {t('files.root')}
                 </BreadcrumbLink>
               </BCItem>
               {crumbs.map((c) => (
