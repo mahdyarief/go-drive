@@ -182,6 +182,7 @@ export interface Store {
   quota_used: number
   quota_limit: number
   provider_quota_limit: number
+  provider_quota_measured_at: string | null
   last_tested_at: string | null
   last_synced_at: string | null
   created_at: string

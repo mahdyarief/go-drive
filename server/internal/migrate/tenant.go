@@ -109,6 +109,7 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			quota_used bigint NOT NULL DEFAULT 0,
 			quota_limit bigint NOT NULL DEFAULT 0,
 			provider_quota_limit bigint NOT NULL DEFAULT 0,
+			provider_quota_measured_at timestamptz,
 			last_tested_at timestamptz,
 			last_synced_at timestamptz,
 			created_at timestamptz NOT NULL DEFAULT now(),
@@ -395,6 +396,7 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS quota_used bigint NOT NULL DEFAULT 0`),
 			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS quota_limit bigint NOT NULL DEFAULT 0`),
 			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS provider_quota_limit bigint NOT NULL DEFAULT 0`),
+			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS provider_quota_measured_at timestamptz`),
 			q(`ALTER TABLE %sworkspace_storage_settings ADD COLUMN IF NOT EXISTS storage_mode text NOT NULL DEFAULT 'cumulative'`),
 		)
 	}
@@ -416,6 +418,9 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
 		}
 		if err := sqliteEnsureColumn(ctx, db, "stores", "provider_quota_limit", "provider_quota_limit bigint NOT NULL DEFAULT 0"); err != nil {
+			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
+		}
+		if err := sqliteEnsureColumn(ctx, db, "stores", "provider_quota_measured_at", "provider_quota_measured_at datetime"); err != nil {
 			return fmt.Errorf("adding column to %s.stores: %w", schema, err)
 		}
 		if err := sqliteEnsureColumn(ctx, db, "workspace_storage_settings", "storage_mode", "storage_mode text NOT NULL DEFAULT 'cumulative'"); err != nil {

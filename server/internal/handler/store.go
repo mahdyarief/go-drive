@@ -19,6 +19,12 @@ import (
 	"go-drive/server/internal/store"
 )
 
+// gdriveQuotaRefreshInterval caps how often ListStores re-measures a gdrive
+// store's provider quota from the live API. Long enough that page loads stay
+// cheap, short enough that stale values (e.g. from the one-time migration)
+// self-correct within a day.
+const gdriveQuotaRefreshInterval = 6 * time.Hour
+
 // ListStores returns attached stores + the primary store id.
 func ListStores(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -30,12 +36,19 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, "listing stores: "+err.Error())
 			return
 		}
-		// Backfill quota for GDrive stores that have never been measured (e.g.
-		// connected before the quota columns existed) so the quota bar always
-		// shows data without requiring a manual Test Connection.
+		// Backfill quota for GDrive stores whose provider quota was never
+		// measured or is older than the refresh interval, so the quota bar
+		// shows live provider data without a manual Test Connection. A nil
+		// ProviderQuotaAt means "never measured from the live API" — that
+		// catches rows the one-time migration copied from the old quota_limit
+		// column (which held stale provider capacity), so they get re-measured
+		// on the next load instead of freezing wrong values forever.
 		for i := range stores {
 			s := &stores[i]
-			if s.Provider != "gdrive" || s.Status != "active" || s.ProviderQuotaLimit != 0 {
+			if s.Provider != "gdrive" || s.Status != "active" {
+				continue
+			}
+			if s.ProviderQuotaAt != nil && time.Since(*s.ProviderQuotaAt) < gdriveQuotaRefreshInterval {
 				continue
 			}
 			st, err := store.BuildStorage(ctx, tx, s)
@@ -50,10 +63,11 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 			if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
 				Where("id = ?", s.ID).
 				Set("quota_used = ?", used, "provider_quota_limit = ?", limit).
-				Set("last_tested_at = ?", now, "updated_at = ?", now).
+				Set("provider_quota_measured_at = ?", now, "last_tested_at = ?", now, "updated_at = ?", now).
 				Exec(ctx); err == nil {
 				s.QuotaUsed = used
 				s.ProviderQuotaLimit = limit
+				s.ProviderQuotaAt = &now
 			}
 		}
 		var primaryID *uuid.UUID
@@ -329,6 +343,7 @@ func TestStore(db *bun.DB) gin.HandlerFunc {
 		if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
 			Set("last_tested_at = ?", now, "updated_at = ?", now).
 			Set("quota_used = ?", used, "provider_quota_limit = ?", limit).
+			Set("provider_quota_measured_at = ?", now).
 			Where("id = ?", id).
 			Exec(ctx); err != nil {
 			Err(c, http.StatusInternalServerError, "updating store: "+err.Error())

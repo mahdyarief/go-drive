@@ -273,6 +273,7 @@ func GDriveStoreComplete(db *bun.DB) gin.HandlerFunc {
 			Set("status = ?", "active").
 			Set("last_tested_at = ?", now).
 			Set("quota_used = ?", used, "provider_quota_limit = ?", limit).
+			Set("provider_quota_measured_at = ?", now).
 			Set("updated_at = ?", now).
 			Exec(ctx); err != nil {
 			Err(c, http.StatusInternalServerError, "updating store: "+err.Error())

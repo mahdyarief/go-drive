@@ -24,6 +24,7 @@ type Store struct {
 	QuotaUsed          int64          `json:"quota_used" bun:"quota_used,notnull,default:0"`
 	QuotaLimit         int64          `json:"quota_limit" bun:"quota_limit,notnull,default:0"`
 	ProviderQuotaLimit int64          `json:"provider_quota_limit" bun:"provider_quota_limit,notnull,default:0"`
+	ProviderQuotaAt    *time.Time     `json:"provider_quota_measured_at" bun:"provider_quota_measured_at"`
 	LastTestedAt       *time.Time     `json:"last_tested_at" bun:"last_tested_at"`
 	LastSyncedAt     *time.Time     `json:"last_synced_at" bun:"last_synced_at"`
 	CreatedAt        time.Time      `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
