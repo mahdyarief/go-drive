@@ -91,6 +91,8 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		// File explorer (M5)
 		tenant.GET("/files", handler.ListFiles(db))
 		tenant.GET("/files/search", handler.SearchFiles(db))
+		tenant.PATCH("/files/batch", handler.BatchMoveFiles(db))
+		tenant.DELETE("/files/batch", handler.BatchDeleteFiles(db))
 		tenant.GET("/files/:id", handler.GetFile(db))
 		tenant.PATCH("/files/:id", handler.UpdateFile(db))
 		tenant.DELETE("/files/:id", handler.DeleteFile(db))
