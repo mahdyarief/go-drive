@@ -47,10 +47,10 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
 - [x] **#4 Storage breakdown** — endpoint `GET /api/t/storage/breakdown` (photo/video/document) + tampilan di halaman dashboard/stores.
 - [x] **#5 Batch file ops** — `PATCH/DELETE /api/t/files/batch` (body berisi array id) + UI select-multiple di FileList.
 - [ ] **#8 Recent folders** — `GET /api/t/folders/recent?limit=4` (ORDER BY updated_at DESC) + quick-nav di sidebar.
-- [ ] **#10 In-app API docs** — halaman dokumentasi (cURL + JS examples) untuk upload API.
+- [x] **#10 In-app API docs** — halaman dokumentasi (cURL + JS examples) untuk upload API.
 
 ### P3 — Belakangan (opsional)
-- [ ] **#6 Audit log** — tabel `audit_logs` + `createAuditLog` util + halaman Activity Log.
+- [x] **#6 Audit log** — tabel `audit_logs` + `createAuditLog` util + halaman Activity Log.
 - [ ] **#7 Preview token** — short-lived token untuk preview publik.
 - [ ] **#9 Resumable upload** — kompleks, hanya untuk Google Drive; prioritas rendah.
 
@@ -65,11 +65,11 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
 | #3 External upload API + API key | ✅ | `06cdc4e` (merge `ab93973`) | Tabel `api_keys` public schema (org_slug, key_prefix, key_hash SHA-256, scopes, status, revoked_at); `POST /api/v1/uploads` via `RequireAPIKey` + `APIKeyTenantTx`; CRUD `/api/t/api-keys`; secret `9d_live_` + 40 hex one-time display |
 | #4 Storage breakdown | ✅ | `1325d9b` (merge `f0564af`) | `GET /api/t/storage/breakdown` (GROUP BY mime_type → photo/video/document, total); `StorageBreakdownCard.tsx` segmented bar di StoresPage; i18n `storage.*` |
 | #5 Batch file ops | ✅ | `2ea0ee5` (merge `f0564af`) + fix `680c7c2` | `PATCH/DELETE /api/t/files/batch` (move/delete by id array, `{moved}`/`{deleted}`); select-multiple mode di FilesPage (`batchOps.ts` + `BatchFileBar.tsx`); fix `moveObject` handle-close Windows + cleanup `blob_locations` di `DeleteFileEverywhere` |
-| #6 Audit log | ⬜ Belum dimulai | — | — |
+| #6 Audit log | ✅ | `d8d10ac` (merge `6947eae`) + fix `db28321` | Tabel tenant `audit_logs` (user_id, action, entity_type, entity_id, metadata jsonb, created_at) + index `(user_id, created_at DESC)`; `GET /api/t/audit-logs` (LIMIT 100 DESC, per-user); instrumentasi best-effort: file_upload/file_delete/file_delete_batch/file_move/file_move_batch/folder_create/folder_delete/api_key_create/api_key_revoke; `ActivityLogPage.tsx` (useQuery `['t','audit-logs',orgSlug]`) + `activity/ActivityLogRow.tsx` + `activity.ts`; i18n `activity.*`; fix: frontend baca snake_case (`entity_type`/`entity_id`/`created_at`) sesuai konvensi seluruh codebase |
 | #7 Preview token | ⬜ Belum dimulai | — | — |
 | #8 Recent folders | ✅ | `b82aadb` (merge `e6e73d6`) | `GET /api/t/folders/recent?limit=4` (updated_at DESC, default 4); `RecentFolders.tsx` quick-nav di sidebar; FilesPage baca param `?folder=` |
 | #9 Resumable upload | ⬜ Belum dimulai | — | — |
-| #10 In-app API docs | ⬜ Belum dimulai | — | — |
+| #10 In-app API docs | ✅ | `d86a08c` (merge `6947eae`) | `ApiDocsPage.tsx` (Overview, Authentication `9d_live_`, `POST /api/v1/uploads`, cURL + JS fetch examples, error table 400/401/500, API Key Management quick ref); `apiDocs/CodeBlock.tsx` (copy-to-clipboard) + `apiDocs/EndpointCard.tsx`; route `/app/api-docs` + nav sidebar; i18n `apiDocs.*` (45 keys) en/id parity |
 
 **Status legend**: ⬜ Belum dimulai · 🔄 Sedang dikerjakan · ✅ Selesai (committed + pushed)
 
