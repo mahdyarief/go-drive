@@ -6,7 +6,8 @@ import { useUploadStore } from '@/store/upload'
 
 // UploadPanel is a fixed bottom-right progress panel fed by the global upload
 // store. It appears on every app page while uploads are in flight and lists
-// one row per file with status; rows can be dismissed and the list cleared.
+// one row per file with per-file progress/status; rows can be dismissed and
+// the list cleared.
 export function UploadPanel() {
   const { t } = useTranslation()
   const entries = useUploadStore((s) => s.entries)
@@ -39,15 +40,28 @@ export function UploadPanel() {
         {open && (
           <div className="space-y-2 p-3">
             {entries.map((entry) => (
-              <div key={entry.id} className="flex items-center gap-2 text-xs">
-                {entry.status === 'uploading' && <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />}
-                {entry.status === 'done' && <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}
-                {entry.status === 'error' && <XCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />}
-                <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                {entry.status === 'uploading' && <span className="text-muted-foreground">{entry.percent}%</span>}
-                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => remove(entry.id)} aria-label={t('files.dismiss')}>
-                  <X className="h-3 w-3" />
-                </Button>
+              <div key={entry.id} className="text-xs">
+                <div className="flex items-center gap-2">
+                  {entry.status === 'uploading' && <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />}
+                  {entry.status === 'done' && <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />}
+                  {entry.status === 'error' && <XCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />}
+                  <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+                  {entry.status === 'uploading' && <span className="text-muted-foreground">{entry.percent}%</span>}
+                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => remove(entry.id)} aria-label={t('files.dismiss')}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+                {entry.status === 'uploading' && (
+                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width] duration-150"
+                      style={{ width: `${entry.percent}%` }}
+                    />
+                  </div>
+                )}
+                {entry.status === 'error' && entry.error && (
+                  <p className="mt-1 truncate text-[10px] text-destructive">{entry.error}</p>
+                )}
               </div>
             ))}
           </div>

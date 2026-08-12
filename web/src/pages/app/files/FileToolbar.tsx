@@ -186,7 +186,7 @@ export function FileToolbar({
       <Button render={<label className="cursor-pointer flex items-center gap-1.5" />}>
         <Upload className="h-4 w-4" />
         {t('files.upload')}
-        <input type="file" className="hidden" onChange={onUpload} disabled={uploadPending} />
+        <input type="file" multiple className="hidden" onChange={onUpload} disabled={uploadPending} />
       </Button>
     </div>
   )

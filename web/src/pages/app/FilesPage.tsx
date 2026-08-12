@@ -39,8 +39,7 @@ export default function FilesPage() {
   const navigate = useNavigate()
   const currentOrg = useOrgStore((s) => s.currentOrg)
   const orgSlug = currentOrg?.slug
-  const addUpload = useUploadStore((s) => s.add)
-  const updateUpload = useUploadStore((s) => s.update)
+  const uploadBatch = useUploadStore((s) => s.uploadBatch)
 
   const [searchParams] = useSearchParams()
   const initialQuery = searchParams.get('q') ?? ''
@@ -177,22 +176,7 @@ export default function FilesPage() {
   })
 
   const uploadFiles = useMutation({
-    mutationFn: (files: FileList) => {
-      const form = new FormData()
-      form.append('file', files[0])
-      if (currentFolderId) form.append('folderId', currentFolderId)
-      const id = crypto.randomUUID()
-      addUpload({ id, name: files[0].name, percent: 0, status: 'uploading' })
-      return tenantApi<unknown>('/api/t/upload', orgSlug!, { method: 'POST', body: form })
-        .then((res) => {
-          updateUpload(id, { percent: 100, status: 'done' })
-          return res
-        })
-        .catch((err) => {
-          updateUpload(id, { status: 'error' })
-          throw err
-        })
-    },
+    mutationFn: (files: FileList) => uploadBatch(Array.from(files), orgSlug!, currentFolderId),
     onSuccess: () => {
       invalidate()
     },

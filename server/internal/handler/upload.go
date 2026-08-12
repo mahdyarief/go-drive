@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"errors"
+	"fmt"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -13,21 +16,35 @@ import (
 	"go-drive/server/internal/store"
 )
 
-// UploadFile handles POST /api/upload — multipart upload to the tenant's
-// primary store. Fields: file, folderId?, fileId? (replace).
+type uploadedFile struct {
+	Name string    `json:"name"`
+	ID   uuid.UUID `json:"id"`
+	Size int64     `json:"size"`
+}
+
+type failedUpload struct {
+	Name  string `json:"name"`
+	Error string `json:"error"`
+}
+
+// UploadFile handles POST /api/t/upload — multipart batch upload to the
+// tenant's store. Fields: files (repeatable), file (legacy single), folderId?.
+// Files are streamed sequentially; per-file failures are collected in "failed"
+// without failing the whole request.
 func UploadFile(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		userID := c.GetString("user_id")
-		ctx := c.Request.Context()
 
-		fileHeader, err := c.FormFile("file")
+		form, err := c.MultipartForm()
 		if err != nil {
-			Err(c, http.StatusBadRequest, "file field is required")
+			Err(c, http.StatusBadRequest, "expected multipart form data")
 			return
 		}
-		if fileHeader.Size > store.MaxFileSize {
-			Err(c, http.StatusRequestEntityTooLarge, "file exceeds 100 MB limit")
+
+		headers := append(form.File["files"], form.File["file"]...)
+		if len(headers) == 0 {
+			Err(c, http.StatusBadRequest, "at least one file is required")
 			return
 		}
 
@@ -41,66 +58,80 @@ func UploadFile(db *bun.DB) gin.HandlerFunc {
 			folderID = &id
 		}
 
-		// Resolve the write store for this workspace (primary in replicate mode,
-		// quota-aware in cumulative mode).
-		s, err := store.ResolveUploadStore(ctx, tx, fileHeader.Size)
-		if err != nil {
-			Err(c, http.StatusInternalServerError, "no active storage configured: "+err.Error())
-			return
-		}
+		uploaded := make([]uploadedFile, 0, len(headers))
+		failed := make([]failedUpload, 0)
 
-		// Build the object key (display path, e.g. docs/reports/q1.pdf).
-		name := filepath.Base(fileHeader.Filename)
-		objectKey := name
-		if folderID != nil {
-			if dir, err := store.FolderPath(ctx, tx, *folderID); err == nil && dir != "" {
-				objectKey = dir + "/" + name
+		for _, h := range headers {
+			f, err := uploadOne(c, tx, userID, folderID, h)
+			if err != nil {
+				failed = append(failed, failedUpload{Name: filepath.Base(h.Filename), Error: err.Error()})
+				continue
 			}
+			uploaded = append(uploaded, *f)
 		}
 
-		// Create the pending file record.
-		contentType := fileHeader.Header.Get("Content-Type")
-		if contentType == "" {
-			contentType = mime.TypeByExtension(filepath.Ext(name))
-		}
-		blob, f, err := store.CreatePendingFileUpload(ctx, tx, userID, folderID, name, objectKey, contentType, fileHeader.Size)
-		if err != nil {
-			Err(c, http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		// Stream the body to the primary store.
-		src, err := fileHeader.Open()
-		if err != nil {
-			Err(c, http.StatusInternalServerError, "opening uploaded file: "+err.Error())
-			return
-		}
-		defer src.Close()
-
-		st, err := store.BuildStorage(ctx, tx, s)
-		if err != nil {
-			Err(c, http.StatusInternalServerError, "building storage: "+err.Error())
-			return
-		}
-		if err := st.Upload(ctx, blob.ObjectKey, src, contentType); err != nil {
-			Err(c, http.StatusInternalServerError, "upload failed: "+err.Error())
-			return
-		}
-
-		// Mark ready + record primary blob location.
-		if err := store.MarkFileUploadReady(ctx, tx, f.ID, blob.ID, s.ID, blob.ObjectKey); err != nil {
-			Err(c, http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		// Replication fanout to writable replicas (M7). Only in replicate mode;
-		// cumulative mode keeps each file on a single store. Runs synchronously
-		// in the tenant tx; failures are non-fatal — the object is already on
-		// the write store, so the upload still succeeds.
-		if mode, err := store.GetStorageMode(ctx, tx); err == nil && mode == "replicate" {
-			_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, userID)
-		}
-
-		Created(c, gin.H{"file": f})
+		Success(c, gin.H{"files": uploaded, "failed": failed})
 	}
+}
+
+func uploadOne(c *gin.Context, tx bun.Tx, userID string, folderID *uuid.UUID, h *multipart.FileHeader) (*uploadedFile, error) {
+	ctx := c.Request.Context()
+
+	if h.Size > store.MaxFileSize {
+		return nil, errors.New("file exceeds 100 MB limit")
+	}
+
+	// Resolve the write store for this workspace (primary in replicate mode,
+	// quota-aware in cumulative mode).
+	s, err := store.ResolveUploadStore(ctx, tx, h.Size)
+	if err != nil {
+		return nil, fmt.Errorf("no active storage configured: %w", err)
+	}
+
+	// Build the object key (display path, e.g. docs/reports/q1.pdf).
+	name := filepath.Base(h.Filename)
+	objectKey := name
+	if folderID != nil {
+		if dir, err := store.FolderPath(ctx, tx, *folderID); err == nil && dir != "" {
+			objectKey = dir + "/" + name
+		}
+	}
+
+	contentType := h.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = mime.TypeByExtension(filepath.Ext(name))
+	}
+
+	blob, f, err := store.CreatePendingFileUpload(ctx, tx, userID, folderID, name, objectKey, contentType, h.Size)
+	if err != nil {
+		return nil, err
+	}
+
+	src, err := h.Open()
+	if err != nil {
+		return nil, fmt.Errorf("opening uploaded file: %w", err)
+	}
+	defer src.Close()
+
+	st, err := store.BuildStorage(ctx, tx, s)
+	if err != nil {
+		return nil, fmt.Errorf("building storage: %w", err)
+	}
+	if err := st.Upload(ctx, blob.ObjectKey, src, contentType); err != nil {
+		return nil, fmt.Errorf("upload failed: %w", err)
+	}
+
+	if err := store.MarkFileUploadReady(ctx, tx, f.ID, blob.ID, s.ID, blob.ObjectKey); err != nil {
+		return nil, err
+	}
+
+	// Replication fanout to writable replicas (M7). Only in replicate mode;
+	// cumulative mode keeps each file on a single store. Runs synchronously
+	// in the tenant tx; failures are non-fatal — the object is already on
+	// the write store, so the upload still succeeds.
+	if mode, err := store.GetStorageMode(ctx, tx); err == nil && mode == "replicate" {
+		_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, userID)
+	}
+
+	return &uploadedFile{Name: f.Name, ID: f.ID, Size: f.Size}, nil
 }
