@@ -766,5 +766,28 @@
     "javascriptLabel": "javascript",
     "httpLabel": "http",
     "jsonLabel": "json"
+  },
+  "activity": {
+    "nav": "Activity",
+    "title": "Activity Log",
+    "subtitle": "Your recent actions across this workspace.",
+    "recentTrail": "Recent activity",
+    "loading": "Loading activity...",
+    "empty": "No activity yet",
+    "emptyHint": "Uploads, deletes, and moves you make will appear here.",
+    "error": "Failed to load activity.",
+    "metadataCount": "{{count}} item(s)",
+    "action": {
+      "fileUpload": "File uploaded",
+      "fileDelete": "File deleted",
+      "fileDeleteBatch": "Files deleted",
+      "fileMove": "File moved",
+      "fileMoveBatch": "Files moved",
+      "folderCreate": "Folder created",
+      "folderDelete": "Folder deleted",
+      "apiKeyCreate": "API key created",
+      "apiKeyRevoke": "API key revoked",
+      "unknown": "Action performed"
+    }
   }
 }

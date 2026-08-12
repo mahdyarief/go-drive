@@ -114,6 +114,7 @@ func CreateFolder(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, "creating folder: "+err.Error())
 			return
 		}
+		auditLog(ctx, tx, userID, "folder_create", "folder", f.ID.String(), map[string]any{"name": f.Name})
 		Created(c, gin.H{"folder": f})
 	}
 }
@@ -234,6 +235,7 @@ func UpdateFolder(db *bun.DB) gin.HandlerFunc {
 func DeleteFolder(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
+		userID := c.GetString("user_id")
 		ctx := c.Request.Context()
 
 		id, err := uuid.Parse(c.Param("id"))
@@ -241,7 +243,8 @@ func DeleteFolder(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusBadRequest, "invalid folder id")
 			return
 		}
-		if err := folderExists(ctx, tx, id); err != nil {
+		var f model.Folder
+		if err := tx.NewSelect().Model(&f).Where("id = ?", id).Scan(ctx); err != nil {
 			Err(c, http.StatusNotFound, "folder not found")
 			return
 		}
@@ -250,6 +253,7 @@ func DeleteFolder(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, err.Error())
 			return
 		}
+		auditLog(ctx, tx, userID, "folder_delete", "folder", id.String(), map[string]any{"name": f.Name})
 		Success(c, gin.H{"deleted": n})
 	}
 }

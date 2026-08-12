@@ -23,6 +23,7 @@ import FilesPage from '@/pages/app/FilesPage'
 import FilePreviewPage from '@/pages/app/FilePreviewPage'
 import StoresPage from '@/pages/app/StoresPage'
 import LinksPage from '@/pages/app/LinksPage'
+import ActivityLogPage from '@/pages/app/ActivityLogPage'
 import ApiDocsPage from '@/pages/app/ApiDocsPage'
 import SettingsMembersPage from '@/pages/app/settings/SettingsMembersPage'
 import SettingsAppearancePage from '@/pages/app/settings/SettingsAppearancePage'
@@ -124,6 +125,7 @@ function App() {
               <Route path="settings/appearance" element={<SettingsAppearancePage />} />
               <Route path="settings/notifications" element={<SettingsNotificationsPage />} />
               <Route path="links" element={<LinksPage />} />
+              <Route path="activity" element={<ActivityLogPage />} />
               <Route path="api-docs" element={<ApiDocsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

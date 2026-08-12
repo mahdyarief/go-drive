@@ -94,6 +94,8 @@ func CreateAPIKey(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 		k.KeyHash = ""
+		tx := c.MustGet("tenant_tx").(bun.Tx)
+		auditLog(ctx, tx, userID, "api_key_create", "api_key", k.ID.String(), map[string]any{"name": k.Name})
 		Created(c, gin.H{"key": k, "secret": secret})
 	}
 }
@@ -103,11 +105,17 @@ func CreateAPIKey(db *bun.DB) gin.HandlerFunc {
 func DeleteAPIKey(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgSlug := c.GetString("org_slug")
+		userID := c.GetString("user_id")
 		ctx := c.Request.Context()
 
 		id, err := uuid.Parse(c.Param("id"))
 		if err != nil {
 			Err(c, http.StatusBadRequest, "invalid API key id")
+			return
+		}
+		var k model.APIKey
+		if err := db.NewSelect().Model(&k).Where("id = ?", id).Where("org_slug = ?", orgSlug).Scan(ctx); err != nil {
+			Err(c, http.StatusNotFound, "API key not found")
 			return
 		}
 		now := time.Now()
@@ -124,6 +132,8 @@ func DeleteAPIKey(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusNotFound, "API key not found")
 			return
 		}
+		tx := c.MustGet("tenant_tx").(bun.Tx)
+		auditLog(ctx, tx, userID, "api_key_revoke", "api_key", id.String(), map[string]any{"name": k.Name})
 		Msg(c, "API key revoked")
 	}
 }

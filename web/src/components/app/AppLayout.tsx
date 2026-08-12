@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/auth'
 import { OrgSwitcher } from '@/components/OrgSwitcher'
 import { NavLink } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { PanelLeftClose, PanelLeft, LogOut, Home, LayoutDashboard, X, Menu, Folder, Database, Link2, Users, Palette, Bell, BookOpen } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, LogOut, Home, LayoutDashboard, X, Menu, Folder, Database, Link2, Users, Palette, Bell, BookOpen, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebarCollapsed } from '@/lib/useSidebarCollapsed'
 import { AppHeader } from '@/components/app/AppHeader'
@@ -83,6 +83,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <NavLink to="/app/links" end className={linkClass}>
             <Link2 className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Links</span>
+          </NavLink>
+          <NavLink to="/app/activity" end className={linkClass}>
+            <History className="h-4 w-4 shrink-0" />
+            <span className={cn(isCollapsed && 'md:hidden')}>{t('activity.nav')}</span>
           </NavLink>
           <div className={cn('mt-4 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground', isCollapsed && 'md:hidden')}>
             Settings
