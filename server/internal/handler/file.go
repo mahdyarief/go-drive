@@ -217,6 +217,7 @@ func ListFiles(db *bun.DB) gin.HandlerFunc {
 func UpdateFile(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
+		userID := c.GetString("user_id")
 		ctx := c.Request.Context()
 
 		id, err := uuid.Parse(c.Param("id"))
@@ -306,6 +307,10 @@ func UpdateFile(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, err.Error())
 			return
 		}
+		// Audit folder moves only; renames keep the same folder.
+		if folderProvided && ((newFolder == nil) != (f.FolderID == nil) || (newFolder != nil && f.FolderID != nil && *newFolder != *f.FolderID)) {
+			auditLog(ctx, tx, userID, "file_move", "file", id.String(), map[string]any{"name": f.Name})
+		}
 		Success(c, gin.H{"file": updated})
 	}
 }
@@ -315,6 +320,7 @@ func UpdateFile(db *bun.DB) gin.HandlerFunc {
 func DeleteFile(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
+		userID := c.GetString("user_id")
 		ctx := c.Request.Context()
 
 		id, err := uuid.Parse(c.Param("id"))
@@ -348,6 +354,7 @@ func DeleteFile(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, err.Error())
 			return
 		}
+		auditLog(ctx, tx, userID, "file_delete", "file", id.String(), map[string]any{"name": f.Name})
 		Msg(c, "file deleted")
 	}
 }
@@ -357,6 +364,7 @@ func DeleteFile(db *bun.DB) gin.HandlerFunc {
 func BatchMoveFiles(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
+		userID := c.GetString("user_id")
 		ctx := c.Request.Context()
 
 		var req struct {
@@ -437,6 +445,7 @@ func BatchMoveFiles(db *bun.DB) gin.HandlerFunc {
 			}
 		}
 
+		auditLog(ctx, tx, userID, "file_move_batch", "file", "", map[string]any{"count": len(req.IDs)})
 		Success(c, gin.H{"moved": len(req.IDs)})
 	}
 }
@@ -446,6 +455,7 @@ func BatchMoveFiles(db *bun.DB) gin.HandlerFunc {
 func BatchDeleteFiles(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
+		userID := c.GetString("user_id")
 		ctx := c.Request.Context()
 
 		var req struct {
@@ -492,6 +502,7 @@ func BatchDeleteFiles(db *bun.DB) gin.HandlerFunc {
 			deleted++
 		}
 
+		auditLog(ctx, tx, userID, "file_delete_batch", "file", "", map[string]any{"count": deleted})
 		Success(c, gin.H{"deleted": deleted})
 	}
 }

@@ -199,6 +199,18 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 		q(`CREATE UNIQUE INDEX IF NOT EXISTS %sfiles_unique_name_in_folder_idx ON %sfiles (folder_id, name) WHERE status = 'ready' AND folder_id IS NOT NULL`, prefix),
 		q(`CREATE UNIQUE INDEX IF NOT EXISTS %sfiles_unique_name_at_root_idx ON %sfiles (name) WHERE status = 'ready' AND folder_id IS NULL`, prefix),
 
+		// Audit log
+		q(`CREATE TABLE IF NOT EXISTS %saudit_logs (
+			id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id text NOT NULL,
+			action text NOT NULL,
+			entity_type text NOT NULL,
+			entity_id text,
+			metadata jsonb,
+			created_at timestamptz NOT NULL DEFAULT now()
+		)`),
+		q(`CREATE INDEX IF NOT EXISTS %saudit_logs_user_created_idx ON %saudit_logs (user_id, created_at DESC)`, prefix),
+
 		// Tags
 		q(`CREATE TABLE IF NOT EXISTS %stags (
 			id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

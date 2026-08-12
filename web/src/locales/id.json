@@ -719,5 +719,28 @@
     "uploading": "Mengunggah...",
     "uploadSuccess": "Berhasil mengunggah {{name}}.",
     "uploadFailed": "Gagal mengunggah."
+  },
+  "activity": {
+    "nav": "Aktivitas",
+    "title": "Log Aktivitas",
+    "subtitle": "Aksi terakhir Anda di ruang kerja ini.",
+    "recentTrail": "Aktivitas terakhir",
+    "loading": "Memuat aktivitas...",
+    "empty": "Belum ada aktivitas",
+    "emptyHint": "Unggahan, penghapusan, dan pemindahan yang Anda lakukan akan muncul di sini.",
+    "error": "Gagal memuat aktivitas.",
+    "metadataCount": "{{count}} item",
+    "action": {
+      "fileUpload": "File diunggah",
+      "fileDelete": "File dihapus",
+      "fileDeleteBatch": "File dihapus",
+      "fileMove": "File dipindahkan",
+      "fileMoveBatch": "File dipindahkan",
+      "folderCreate": "Folder dibuat",
+      "folderDelete": "Folder dihapus",
+      "apiKeyCreate": "Kunci API dibuat",
+      "apiKeyRevoke": "Kunci API dicabut",
+      "unknown": "Aksi dilakukan"
+    }
   }
 }

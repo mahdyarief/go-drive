@@ -139,5 +139,7 @@ func uploadOne(c *gin.Context, tx bun.Tx, userID string, folderID *uuid.UUID, h 
 		_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, userID)
 	}
 
+	auditLog(ctx, tx, userID, "file_upload", "file", f.ID.String(), map[string]any{"name": f.Name, "size": f.Size})
+
 	return &uploadedFile{Name: f.Name, ID: f.ID, Size: f.Size}, nil
 }

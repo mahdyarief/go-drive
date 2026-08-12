@@ -139,6 +139,9 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		tenant.GET("/api-keys", handler.ListAPIKeys(db))
 		tenant.POST("/api-keys", handler.CreateAPIKey(db))
 		tenant.DELETE("/api-keys/:id", handler.DeleteAPIKey(db))
+
+		// Audit log
+		tenant.GET("/audit-logs", handler.ListAuditLogs(db))
 	}
 
 	// Admin API routes (Bearer + admin role required)
