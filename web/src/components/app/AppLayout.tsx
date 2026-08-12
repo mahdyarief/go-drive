@@ -9,6 +9,7 @@ import { useSidebarCollapsed } from '@/lib/useSidebarCollapsed'
 import { AppHeader } from '@/components/app/AppHeader'
 import { StorageUsageSidebar } from '@/components/app/StorageUsageSidebar'
 import { UploadPanel } from '@/components/app/UploadPanel'
+import { RecentFolders } from '@/components/app/RecentFolders'
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isCollapsed, toggleCollapsed] = useSidebarCollapsed()
@@ -76,6 +77,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <Folder className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Files</span>
           </NavLink>
+          <RecentFolders collapsed={isCollapsed} />
           <NavLink to="/app/links" end className={linkClass}>
             <Link2 className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Links</span>

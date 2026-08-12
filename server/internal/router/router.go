@@ -90,6 +90,7 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		tenant.GET("/files/:id/download-url", handler.FileDownloadURL(db))
 
 		tenant.GET("/folders", handler.ListFolders(db))
+		tenant.GET("/folders/recent", handler.RecentFolders(db))
 		tenant.GET("/folders/breadcrumbs", handler.FolderBreadcrumbs(db))
 		tenant.POST("/folders", handler.CreateFolder(db))
 		tenant.PATCH("/folders/:id", handler.UpdateFolder(db))

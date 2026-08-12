@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -37,6 +38,33 @@ func ListFolders(db *bun.DB) gin.HandlerFunc {
 		var folders []model.Folder
 		if err := q.Scan(ctx, &folders); err != nil {
 			Err(c, http.StatusInternalServerError, "listing folders: "+err.Error())
+			return
+		}
+		Success(c, gin.H{"folders": folders})
+	}
+}
+
+// RecentFolders returns the most recently updated folders in the tenant.
+// Dot-folders (e.g. .plugins) are excluded, matching ListFolders.
+func RecentFolders(db *bun.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tx := c.MustGet("tenant_tx").(bun.Tx)
+		ctx := c.Request.Context()
+
+		limit := 4
+		if v := c.Query("limit"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				limit = n
+			}
+		}
+
+		var folders []model.Folder
+		if err := tx.NewSelect().Model((*model.Folder)(nil)).
+			Where("name NOT LIKE '.%'").
+			Order("updated_at DESC").
+			Limit(limit).
+			Scan(ctx, &folders); err != nil {
+			Err(c, http.StatusInternalServerError, "listing recent folders: "+err.Error())
 			return
 		}
 		Success(c, gin.H{"folders": folders})

@@ -43,7 +43,7 @@ export default function FilesPage() {
 
   const [searchParams] = useSearchParams()
   const initialQuery = searchParams.get('q') ?? ''
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(searchParams.get('folder') ?? null)
   const [searchInput, setSearchInput] = useState(initialQuery)
   const [activeSearch, setActiveSearch] = useState(initialQuery)
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({})
