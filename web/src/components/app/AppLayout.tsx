@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/store/auth'
 import { OrgSwitcher } from '@/components/OrgSwitcher'
 import { NavLink } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { PanelLeftClose, PanelLeft, LogOut, Home, LayoutDashboard, X, Menu, Folder, Database, Link2, Users, Palette, Bell } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, LogOut, Home, LayoutDashboard, X, Menu, Folder, Database, Link2, Users, Palette, Bell, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebarCollapsed } from '@/lib/useSidebarCollapsed'
 import { AppHeader } from '@/components/app/AppHeader'
@@ -12,6 +13,7 @@ import { UploadPanel } from '@/components/app/UploadPanel'
 import { RecentFolders } from '@/components/app/RecentFolders'
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   const [isCollapsed, toggleCollapsed] = useSidebarCollapsed()
   const [mobileOpen, setMobileOpen] = useState(false)
   const signOut = useAuthStore((s) => s.signOut)
@@ -100,6 +102,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <NavLink to="/app/settings/notifications" end className={linkClass}>
             <Bell className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Notifications</span>
+          </NavLink>
+          <NavLink to="/app/api-docs" end className={linkClass}>
+            <BookOpen className="h-4 w-4 shrink-0" />
+            <span className={cn(isCollapsed && 'md:hidden')}>{t('apiDocs.nav')}</span>
           </NavLink>
         </nav>
 
