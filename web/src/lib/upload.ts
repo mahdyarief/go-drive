@@ -16,6 +16,8 @@ export interface UploadResult {
   failed: FailedUpload[]
 }
 
+const REQUEST_FAILED = 'Request failed'
+
 // uploadFiles posts a batch of files to the multi-file upload endpoint via
 // XHR so upload.onprogress can drive progress rows. Auth headers mirror api.ts.
 export function uploadFiles(
@@ -37,27 +39,27 @@ export function uploadFiles(
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.setRequestHeader('X-Org-Slug', orgSlug)
 
-    xhr.upload.onprogress = (e) => {
+    xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable && e.total > 0) {
         onProgress(Math.round((e.loaded / e.total) * 100))
       }
-    }
+    })
 
-    xhr.onload = () => {
-      let body: { data?: UploadResult; error?: string }
-      try {
-        body = JSON.parse(xhr.responseText)
-      } catch {
-        reject(new Error('Request failed'))
+    xhr.addEventListener('load', () => {
+      const body: { data?: UploadResult; error?: string } | null = (() => {
+        try {
+          return JSON.parse(xhr.responseText)
+        } catch {
+          return null
+        }
+      })()
+      if (!body || !(xhr.status >= 200 && xhr.status < 300) || !body.data) {
+        reject(new Error(body?.error || REQUEST_FAILED))
         return
       }
-      if (xhr.status >= 200 && xhr.status < 300 && body.data) {
-        resolve(body.data)
-      } else {
-        reject(new Error(body.error || 'Request failed'))
-      }
-    }
-    xhr.onerror = () => reject(new Error('Request failed'))
+      resolve(body.data)
+    })
+    xhr.addEventListener('error', () => reject(new Error(REQUEST_FAILED)))
     xhr.send(form)
   })
 }
