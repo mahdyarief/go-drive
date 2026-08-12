@@ -38,6 +38,7 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 	r.GET("/api/tracked/:token", handler.PublicTrackedLink(db))
 	r.GET("/api/tracked/:token/download", handler.PublicTrackedDownload(db))
 	r.GET("/api/tracked/:token/raw", handler.PublicTrackedRaw(db))
+	r.GET("/api/preview/:token", handler.PublicPreviewByToken(db))
 
 	// External upload API (M9) — API-key authenticated, no session required.
 	// RequireAPIKey resolves the owning org from the key; APIKeyTenantTx opens
@@ -98,6 +99,7 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		tenant.PATCH("/files/:id", handler.UpdateFile(db))
 		tenant.DELETE("/files/:id", handler.DeleteFile(db))
 		tenant.GET("/files/:id/download-url", handler.FileDownloadURL(db))
+		tenant.POST("/files/:id/preview-token", handler.CreateFilePreviewToken(db))
 
 		tenant.GET("/folders", handler.ListFolders(db))
 		tenant.GET("/folders/recent", handler.RecentFolders(db))

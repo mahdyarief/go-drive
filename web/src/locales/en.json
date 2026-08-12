@@ -789,5 +789,9 @@
       "apiKeyRevoke": "API key revoked",
       "unknown": "Action performed"
     }
+  },
+  "preview": {
+    "copyLink": "Copy preview link",
+    "copied": "Copied"
   }
 }

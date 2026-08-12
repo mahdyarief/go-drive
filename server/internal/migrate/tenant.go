@@ -404,6 +404,17 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			updated_at timestamptz NOT NULL DEFAULT now(),
 			UNIQUE (file_id, plugin_slug)
 		)`),
+
+		// Preview tokens (short-lived anonymous file streaming)
+		q(`CREATE TABLE IF NOT EXISTS %sfile_preview_tokens (
+			id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+			file_id uuid NOT NULL,
+			user_id text NOT NULL,
+			token_hash text NOT NULL UNIQUE,
+			expires_at timestamptz NOT NULL,
+			created_at timestamptz NOT NULL DEFAULT now()
+		)`),
+		q(`CREATE INDEX IF NOT EXISTS %sfile_preview_tokens_expires_idx ON %sfile_preview_tokens (expires_at)`, prefix),
 	}
 
 	// Postgres additive alterations ride along in the same loop (ADD COLUMN

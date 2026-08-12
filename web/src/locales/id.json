@@ -789,5 +789,9 @@
       "apiKeyRevoke": "Kunci API dicabut",
       "unknown": "Aksi dilakukan"
     }
+  },
+  "preview": {
+    "copyLink": "Salin tautan pratinjau",
+    "copied": "Tersalin"
   }
 }

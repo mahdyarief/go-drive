@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router'
@@ -9,9 +9,17 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Download, Eye, File as FileIcon, Loader2 } from 'lucide-react'
+import { ArrowLeft, Check, Download, Eye, File as FileIcon, Link2, Loader2 } from 'lucide-react'
+
+const COPIED_RESET_MS = 2000
 
 interface DownloadUrlData {
+  url: string
+}
+
+interface PreviewTokenData {
+  token: string
+  expiresAt: string
   url: string
 }
 
@@ -35,6 +43,8 @@ export default function FilePreviewPage() {
   const currentOrg = useOrgStore((s) => s.currentOrg)
   const orgSlug = currentOrg?.slug
   const [previewUrl, setPreviewUrl] = useState('')
+  const [copied, setCopied] = useState(false)
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fileQuery = useQuery({
     queryKey: ['t', 'files', fileId, 'single', orgSlug],
@@ -58,6 +68,13 @@ export default function FilePreviewPage() {
     mutationFn: () => tenantApi<DownloadUrlData>(`/api/t/files/${fileId}/download-url`, orgSlug!),
   })
 
+  const previewToken = useMutation({
+    mutationFn: () =>
+      tenantApi<PreviewTokenData>(`/api/t/files/${fileId}/preview-token`, orgSlug!, {
+        method: 'POST',
+      }),
+  })
+
   const handlePreview = () => {
     downloadUrl.mutate(undefined, {
       onSuccess: (data) => setPreviewUrl(data.url),
@@ -67,6 +84,20 @@ export default function FilePreviewPage() {
   const handleDownload = () => {
     downloadUrl.mutate(undefined, {
       onSuccess: (data) => window.open(data.url, '_blank', 'noopener,noreferrer'),
+    })
+  }
+
+  const handleCopyLink = () => {
+    previewToken.mutate(undefined, {
+      onSuccess: (data) => {
+        const fullUrl = window.location.origin + data.url
+        navigator.clipboard.writeText(fullUrl).catch(() => {})
+        setCopied(true)
+        if (copyResetTimer.current) {
+          clearTimeout(copyResetTimer.current)
+        }
+        copyResetTimer.current = setTimeout(() => setCopied(false), COPIED_RESET_MS)
+      },
     })
   }
 
@@ -115,11 +146,18 @@ export default function FilePreviewPage() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           {t('files.back')}
         </Button>
-        <Button variant="outline" onClick={handleDownload} disabled={downloadUrl.isPending}>
-          {downloadUrl.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-          <Download className="h-4 w-4 mr-2" />
-          {t('files.download')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={handleCopyLink} disabled={previewToken.isPending}>
+            {previewToken.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {copied ? <Check className="h-4 w-4 mr-2" /> : <Link2 className="h-4 w-4 mr-2" />}
+            {copied ? t('preview.copied') : t('preview.copyLink')}
+          </Button>
+          <Button variant="outline" onClick={handleDownload} disabled={downloadUrl.isPending}>
+            {downloadUrl.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Download className="h-4 w-4 mr-2" />
+            {t('files.download')}
+          </Button>
+        </div>
       </div>
 
       <Card>
