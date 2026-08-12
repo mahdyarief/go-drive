@@ -4,10 +4,10 @@ import { Download, History, Move, Plus, Trash2 } from 'lucide-react'
 export interface AuditLog {
   id: string
   action: string
-  entityType: string
-  entityId: string | null
+  entity_type: string
+  entity_id: string | null
   metadata: Record<string, unknown> | string | null
-  createdAt: string
+  created_at: string
 }
 
 export interface AuditLogsData {

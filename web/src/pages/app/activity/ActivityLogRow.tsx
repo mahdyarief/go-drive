@@ -20,8 +20,8 @@ export function ActivityLogRow({ log }: ActivityLogRowProps) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <p className="text-sm font-medium">{t(actionLabelKey(log.action))}</p>
-          <time className="text-xs text-muted-foreground" dateTime={log.createdAt}>
-            {new Date(log.createdAt).toLocaleString()}
+          <time className="text-xs text-muted-foreground" dateTime={log.created_at}>
+            {new Date(log.created_at).toLocaleString()}
           </time>
         </div>
         {parts.length > 0 && (
