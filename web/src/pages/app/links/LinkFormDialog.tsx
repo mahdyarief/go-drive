@@ -34,7 +34,7 @@ export function LinkFormDialog({ open, kind, editTarget, form, onFormChange, isP
           {kind !== 'share' && (
             <div className="space-y-2">
               <Label htmlFor="l-name">{t('links.name')}</Label>
-              <Input id="l-name" value={form.name} onChange={(e) => set({ name: e.target.value })} />
+              <Input id="l-name" value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('links.namePlaceholder')} />
             </div>
           )}
           {kind !== 'upload' && (
@@ -54,17 +54,17 @@ export function LinkFormDialog({ open, kind, editTarget, form, onFormChange, isP
           {kind !== 'upload' && (
             <div className="space-y-2">
               <Label htmlFor="l-file">{t('links.fileId')}</Label>
-              <Input id="l-file" value={form.fileId} onChange={(e) => set({ fileId: e.target.value })} placeholder="uuid" />
+              <Input id="l-file" value={form.fileId} onChange={(e) => set({ fileId: e.target.value })} placeholder={t('links.fileIdPlaceholder')} />
             </div>
           )}
           <div className="space-y-2">
             <Label htmlFor="l-folder">{t('links.folderId')}</Label>
-            <Input id="l-folder" value={form.folderId} onChange={(e) => set({ folderId: e.target.value })} placeholder="uuid" />
+            <Input id="l-folder" value={form.folderId} onChange={(e) => set({ folderId: e.target.value })} placeholder={t('links.folderIdPlaceholder')} />
           </div>
           {kind === 'tracked' && (
             <div className="space-y-2">
               <Label htmlFor="l-desc">{t('links.description')}</Label>
-              <Input id="l-desc" value={form.description} onChange={(e) => set({ description: e.target.value })} />
+              <Input id="l-desc" value={form.description} onChange={(e) => set({ description: e.target.value })} placeholder={t('links.descriptionPlaceholder')} />
             </div>
           )}
           <div className="space-y-2">
@@ -74,22 +74,24 @@ export function LinkFormDialog({ open, kind, editTarget, form, onFormChange, isP
           <div className="space-y-2">
             <Label htmlFor="l-expires">{t('links.expires')}</Label>
             <Input id="l-expires" type="date" value={form.expiresAt} onChange={(e) => set({ expiresAt: e.target.value })} />
+            <p className="text-xs text-muted-foreground">{t('links.expiresHint')}</p>
           </div>
           {kind === 'share' && (
             <div className="space-y-2">
               <Label htmlFor="l-maxdl">{t('links.maxDownloads')}</Label>
-              <Input id="l-maxdl" type="number" value={form.maxDownloads} onChange={(e) => set({ maxDownloads: e.target.value })} />
+              <Input id="l-maxdl" type="number" value={form.maxDownloads} onChange={(e) => set({ maxDownloads: e.target.value })} placeholder={t('links.limitPlaceholder')} />
             </div>
           )}
           {kind === 'upload' && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="l-maxfiles">{t('links.maxFiles')}</Label>
-                <Input id="l-maxfiles" type="number" value={form.maxFiles} onChange={(e) => set({ maxFiles: e.target.value })} />
+                <Input id="l-maxfiles" type="number" value={form.maxFiles} onChange={(e) => set({ maxFiles: e.target.value })} placeholder={t('links.limitPlaceholder')} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="l-maxsize">{t('links.maxFileSize')}</Label>
-                <Input id="l-maxsize" type="number" value={form.maxFileSize} onChange={(e) => set({ maxFileSize: e.target.value })} />
+                <Input id="l-maxsize" type="number" value={form.maxFileSize} onChange={(e) => set({ maxFileSize: e.target.value })} placeholder={t('links.maxFileSizePlaceholder')} />
+                <p className="text-xs text-muted-foreground">{t('links.maxFileSizeHint')}</p>
               </div>
             </>
           )}
@@ -97,7 +99,7 @@ export function LinkFormDialog({ open, kind, editTarget, form, onFormChange, isP
             <>
               <div className="space-y-2">
                 <Label htmlFor="l-maxviews">{t('links.maxViews')}</Label>
-                <Input id="l-maxviews" type="number" value={form.maxViews} onChange={(e) => set({ maxViews: e.target.value })} />
+                <Input id="l-maxviews" type="number" value={form.maxViews} onChange={(e) => set({ maxViews: e.target.value })} placeholder={t('links.limitPlaceholder')} />
               </div>
               <div className="flex items-center gap-2">
                 <Switch id="l-email" checked={form.requireEmail} onCheckedChange={(v) => set({ requireEmail: v })} />

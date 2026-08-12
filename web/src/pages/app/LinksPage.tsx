@@ -206,6 +206,10 @@ export default function LinksPage() {
         </Button>
       </div>
 
+      <p className="text-sm text-muted-foreground">
+        {activeTab === 'share' ? t('links.tabShareHelp') : activeTab === 'upload' ? t('links.tabUploadHelp') : t('links.tabTrackedHelp')}
+      </p>
+
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LinkKind)}>
         <TabsList>
           <TabsTrigger value="share">{t('links.tabShare')}</TabsTrigger>
