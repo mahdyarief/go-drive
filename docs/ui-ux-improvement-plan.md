@@ -57,12 +57,12 @@
   - Ini jadi fondasi fitur #1 multi-upload (lihat `docs/9drive-absorption.md`).
 
 ### Batch B — File browsing
-- [ ] **B1. Drag-drop upload di FilesPage**
+- [x] **B1. Drag-drop upload di FilesPage**
   - Drag overlay di container FilesPage (dragenter/dragleave/dragover/drop), pakai upload handler existing. Overlay: border dashed + teks "Drop files to upload".
-- [ ] **B2. Folder color + icon UI**
+- [x] **B2. Folder color + icon UI**
   - Model `folders` sudah punya `Color` (string hex). Cek apakah `icon_url` perlu ditambah di model + migration `server/internal/migrate/tenant.go`.
   - UI: color swatch picker di New Folder dialog + di grid tile folder (`FolderIcon` diwarnai `style={{ color }}`), mirip FolderVisual 9drive.
-- [ ] **B3. File details drawer**
+- [x] **B3. File details drawer**
   - Komponen `FileDetailsDrawer.tsx` di `pages/app/files/`: panel kanan (shadcn `Sheet`/Drawer) menampilkan meta file (nama, ukuran, tanggal, store, tags), aksi (download, rename, move, delete, share). Buka dari FileItemActions atau klik info.
 
 ### Batch C — Penyempurnaan
@@ -91,9 +91,9 @@
 | A1 | Global header (search + theme toggle + actions slot) | ✅ | `06ca66c` | `AppHeader.tsx`; search → `/app/files?q=` |
 | A2 | Storage usage block di sidebar | ✅ | `06ca66c` | `StorageUsageSidebar.tsx`; mode collapse = bar tipis |
 | A3 | Upload progress panel bottom-right | ✅ | `06ca66c` | `UploadPanel.tsx` + `store/upload.ts`; fondasi multi-upload |
-| B1 | Drag-drop upload | ⬜ | — | — |
-| B2 | Folder color + icon UI | ⬜ | — | Model sudah punya `color`; cek `icon_url` |
-| B3 | File details drawer | ⬜ | — | — |
+| B1 | Drag-drop upload | ✅ | `a7cf54c` | `FileDropZone.tsx`; dragDepth counter utk nested drag |
+| B2 | Folder color + icon UI | ✅ | `a7cf54c` | `FOLDER_COLORS` + swatch picker + tint `FolderIcon`; tanpa `icon_url` |
+| B3 | File details drawer | ✅ | `a7cf54c` | `FileDetailsDrawer.tsx` via base-ui Dialog kanan |
 | C1 | Advanced search filters | ⬜ | — | — |
 | C2 | System status dropdown | ⬜ | — | — |
 | C3 | Empty state + loading polish | ⬜ | — | — |
