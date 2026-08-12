@@ -44,15 +44,15 @@
 ## 3. Roadmap Implementasi (urutan prioritas)
 
 ### Batch A — Layout shell (dampak paling terlihat)
-- [ ] **A1. Global header di AppLayout**
+- [x] **A1. Global header di AppLayout**
   - Tambah header bar di `web/src/components/app/AppLayout.tsx` (di atas `<main>` content, mobile-first): search input (tenant-scoped, navigasi ke `/app/files?q=...` atau pakai pattern FilesPage existing), theme toggle icon (Sun/Moon dari `store/preferences.ts`), dan slot header-actions via `useOutletContext`.
   - Tambah komponen baru `web/src/components/app/AppHeader.tsx` (bukan god file — AppLayout harus tetap tipis).
   - i18n keys baru di `en.json`/`id.json` (`app.searchPlaceholder`, dll).
-- [ ] **A2. Storage usage block di sidebar**
+- [x] **A2. Storage usage block di sidebar**
   - Tambah `StorageUsageSidebar.tsx` di footer sidebar (sebelum user block): quota bar (used/total dari `GET /api/t/storage/usage`), daftar store + used, tombol refresh.
   - Query key `['t','storage','usage',orgSlug]`; refetch saat `currentOrg` berubah (gunakan `useOrgStore`).
   - Mode collapse: sembunyikan teks, tampilkan hanya progress bar tipis.
-- [ ] **A3. Upload progress panel bottom-right**
+- [x] **A3. Upload progress panel bottom-right**
   - Extend `UploadProgressCard` jadi global `UploadPanel` fixed bottom-right (collapsible, daftar file per-entry, status per-file, tombol retry). Tempatkan di `AppLayout` supaya muncul di semua halaman.
   - Ini jadi fondasi fitur #1 multi-upload (lihat `docs/9drive-absorption.md`).
 
@@ -88,9 +88,9 @@
 
 | Batch | Item | Status | Commit | Catatan |
 |---|---|---|---|---|
-| A1 | Global header (search + theme toggle + actions slot) | ⬜ | — | — |
-| A2 | Storage usage block di sidebar | ⬜ | — | — |
-| A3 | Upload progress panel bottom-right | ⬜ | — | — |
+| A1 | Global header (search + theme toggle + actions slot) | ✅ | `06ca66c` | `AppHeader.tsx`; search → `/app/files?q=` |
+| A2 | Storage usage block di sidebar | ✅ | `06ca66c` | `StorageUsageSidebar.tsx`; mode collapse = bar tipis |
+| A3 | Upload progress panel bottom-right | ✅ | `06ca66c` | `UploadPanel.tsx` + `store/upload.ts`; fondasi multi-upload |
 | B1 | Drag-drop upload | ⬜ | — | — |
 | B2 | Folder color + icon UI | ⬜ | — | Model sudah punya `color`; cek `icon_url` |
 | B3 | File details drawer | ⬜ | — | — |
