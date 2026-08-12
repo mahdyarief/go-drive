@@ -66,9 +66,9 @@
   - Komponen `FileDetailsDrawer.tsx` di `pages/app/files/`: panel kanan (shadcn `Sheet`/Drawer) menampilkan meta file (nama, ukuran, tanggal, store, tags), aksi (download, rename, move, delete, share). Buka dari FileItemActions atau klik info.
 
 ### Batch C — Penyempurnaan
-- [ ] **C1. Advanced search filters** (kind/size/date) — extend endpoint search atau filter client-side.
-- [ ] **C2. System status dropdown** di header (ringkasan tenant: jumlah store, status sync, quota) — ganti/duplikat dari TenantStatusPage.
-- [ ] **C3. Empty state + loading polish** di FilesPage (ikon besar + CTA, skeleton rows).
+- [x] **C1. Advanced search filters** (kind/size/date) — extend endpoint search atau filter client-side.
+- [x] **C2. System status dropdown** di header (ringkasan tenant: jumlah store, status sync, quota) — ganti/duplikat dari TenantStatusPage.
+- [x] **C3. Empty state + loading polish** di FilesPage (ikon besar + CTA, skeleton rows).
 
 ---
 
@@ -94,9 +94,9 @@
 | B1 | Drag-drop upload | ✅ | `a7cf54c` | `FileDropZone.tsx`; dragDepth counter utk nested drag |
 | B2 | Folder color + icon UI | ✅ | `a7cf54c` | `FOLDER_COLORS` + swatch picker + tint `FolderIcon`; tanpa `icon_url` |
 | B3 | File details drawer | ✅ | `a7cf54c` | `FileDetailsDrawer.tsx` via base-ui Dialog kanan |
-| C1 | Advanced search filters | ⬜ | — | — |
-| C2 | System status dropdown | ⬜ | — | — |
-| C3 | Empty state + loading polish | ⬜ | — | — |
+| C1 | Advanced search filters | ✅ | `7d5f5ce` | `SearchFiles` + filter kind/size/date; `FileToolbar` popover + `buildSearchUrl` |
+| C2 | System status dropdown | ✅ | `7d5f5ce` | `SystemStatusDropdown.tsx` di header; fetch-on-open per tenant |
+| C3 | Empty state + loading polish | ✅ | `7d5f5ce` | `FileEmptyState.tsx` + `FileListSkeleton.tsx`; FilesPage 499 baris |
 
 **Status legend**: ⬜ Belum dimulai · 🔄 Sedang dikerjakan · ✅ Selesai (committed + pushed)
 
