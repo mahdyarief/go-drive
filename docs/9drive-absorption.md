@@ -44,8 +44,8 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
   - One-time secret display saat create; hash disimpan di DB.
 
 ### P2 — Penyempurnaan
-- [ ] **#4 Storage breakdown** — endpoint `GET /api/t/storage/breakdown` (photo/video/document) + tampilan di halaman dashboard/stores.
-- [ ] **#5 Batch file ops** — `PATCH/DELETE /api/t/files/batch` (body berisi array id) + UI select-multiple di FileList.
+- [x] **#4 Storage breakdown** — endpoint `GET /api/t/storage/breakdown` (photo/video/document) + tampilan di halaman dashboard/stores.
+- [x] **#5 Batch file ops** — `PATCH/DELETE /api/t/files/batch` (body berisi array id) + UI select-multiple di FileList.
 - [ ] **#8 Recent folders** — `GET /api/t/folders/recent?limit=4` (ORDER BY updated_at DESC) + quick-nav di sidebar.
 - [ ] **#10 In-app API docs** — halaman dokumentasi (cURL + JS examples) untuk upload API.
 
@@ -63,8 +63,8 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
 | #1 Multi-upload + progress | ✅ | `2fdc13d` + `c7e857f` | `POST /api/t/upload` multi-file (`files` field, legacy `file` tetap); response `{files,failed}` per-file; XHR progress panel multi-entry (`lib/upload.ts` + `store/upload.ts` `uploadBatch` + `UploadPanel.tsx`) |
 | #2 Upload routing policy | ✅ | `4f2f2cd` (merge `ab93973`) | Tabel tenant `store_routing_policy` (mode most_available/round_robin/priority, priority_store_ids, round_robin_cursor); `GET/PATCH /api/t/storage/routing-policy`; selector policy-aware di `store/file_records.go` (`ResolveUploadStoreReserved` + stale-quota auto-refresh >5 menit); reserved-bytes per batch di `handler/upload.go` |
 | #3 External upload API + API key | ✅ | `06cdc4e` (merge `ab93973`) | Tabel `api_keys` public schema (org_slug, key_prefix, key_hash SHA-256, scopes, status, revoked_at); `POST /api/v1/uploads` via `RequireAPIKey` + `APIKeyTenantTx`; CRUD `/api/t/api-keys`; secret `9d_live_` + 40 hex one-time display |
-| #4 Storage breakdown | ⬜ Belum dimulai | — | — |
-| #5 Batch file ops | ⬜ Belum dimulai | — | — |
+| #4 Storage breakdown | ✅ | `1325d9b` (merge `f0564af`) | `GET /api/t/storage/breakdown` (GROUP BY mime_type → photo/video/document, total); `StorageBreakdownCard.tsx` segmented bar di StoresPage; i18n `storage.*` |
+| #5 Batch file ops | ✅ | `2ea0ee5` (merge `f0564af`) + fix `680c7c2` | `PATCH/DELETE /api/t/files/batch` (move/delete by id array, `{moved}`/`{deleted}`); select-multiple mode di FilesPage (`batchOps.ts` + `BatchFileBar.tsx`); fix `moveObject` handle-close Windows + cleanup `blob_locations` di `DeleteFileEverywhere` |
 | #6 Audit log | ⬜ Belum dimulai | — | — |
 | #7 Preview token | ⬜ Belum dimulai | — | — |
 | #8 Recent folders | ✅ | `b82aadb` (merge `e6e73d6`) | `GET /api/t/folders/recent?limit=4` (updated_at DESC, default 4); `RecentFolders.tsx` quick-nav di sidebar; FilesPage baca param `?folder=` |
