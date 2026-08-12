@@ -46,13 +46,13 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
 ### P2 — Penyempurnaan
 - [x] **#4 Storage breakdown** — endpoint `GET /api/t/storage/breakdown` (photo/video/document) + tampilan di halaman dashboard/stores.
 - [x] **#5 Batch file ops** — `PATCH/DELETE /api/t/files/batch` (body berisi array id) + UI select-multiple di FileList.
-- [ ] **#8 Recent folders** — `GET /api/t/folders/recent?limit=4` (ORDER BY updated_at DESC) + quick-nav di sidebar.
+- [x] **#8 Recent folders** — `GET /api/t/folders/recent?limit=4` (ORDER BY updated_at DESC) + quick-nav di sidebar.
 - [x] **#10 In-app API docs** — halaman dokumentasi (cURL + JS examples) untuk upload API.
 
 ### P3 — Belakangan (opsional)
 - [x] **#6 Audit log** — tabel `audit_logs` + `createAuditLog` util + halaman Activity Log.
-- [ ] **#7 Preview token** — short-lived token untuk preview publik.
-- [ ] **#9 Resumable upload** — kompleks, hanya untuk Google Drive; prioritas rendah.
+- [x] **#7 Preview token** — short-lived token untuk preview publik.
+- [ ] **#9 Resumable upload** — kompleks, hanya untuk Google Drive; prioritas rendah. **Ditunda**: referensi 9drive khusus Google Drive (proxy ke resumable session API Google), tidak bisa diuji tanpa kredensial Google asli — melanggar kontrak verifikasi (keputusan user 2026-08-12).
 
 ---
 
@@ -66,9 +66,9 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
 | #4 Storage breakdown | ✅ | `1325d9b` (merge `f0564af`) | `GET /api/t/storage/breakdown` (GROUP BY mime_type → photo/video/document, total); `StorageBreakdownCard.tsx` segmented bar di StoresPage; i18n `storage.*` |
 | #5 Batch file ops | ✅ | `2ea0ee5` (merge `f0564af`) + fix `680c7c2` | `PATCH/DELETE /api/t/files/batch` (move/delete by id array, `{moved}`/`{deleted}`); select-multiple mode di FilesPage (`batchOps.ts` + `BatchFileBar.tsx`); fix `moveObject` handle-close Windows + cleanup `blob_locations` di `DeleteFileEverywhere` |
 | #6 Audit log | ✅ | `d8d10ac` (merge `6947eae`) + fix `db28321` | Tabel tenant `audit_logs` (user_id, action, entity_type, entity_id, metadata jsonb, created_at) + index `(user_id, created_at DESC)`; `GET /api/t/audit-logs` (LIMIT 100 DESC, per-user); instrumentasi best-effort: file_upload/file_delete/file_delete_batch/file_move/file_move_batch/folder_create/folder_delete/api_key_create/api_key_revoke; `ActivityLogPage.tsx` (useQuery `['t','audit-logs',orgSlug]`) + `activity/ActivityLogRow.tsx` + `activity.ts`; i18n `activity.*`; fix: frontend baca snake_case (`entity_type`/`entity_id`/`created_at`) sesuai konvensi seluruh codebase |
-| #7 Preview token | ⬜ Belum dimulai | — | — |
+| #7 Preview token | ✅ | `e209479` | `POST /api/t/files/:id/preview-token` (auth, tenant-scoped) → token `crypto/rand` + SHA-256 hash disimpan di tabel tenant `file_preview_tokens` (hanya hash, TTL 10 menit `previewTokenTTL`, `expires_at` index); `GET /api/preview/:token` publik tanpa auth (resolve org via `link_tokens` public registry + `tenant.OpenTx`, `Content-Disposition: inline`, streaming byte-identical, 404 untuk token invalid/expired/file tidak ready); tombol "Copy preview link" di `FilePreviewPage.tsx` (251 baris, `COPIED_RESET_MS`) + i18n `preview.*` |
 | #8 Recent folders | ✅ | `b82aadb` (merge `e6e73d6`) | `GET /api/t/folders/recent?limit=4` (updated_at DESC, default 4); `RecentFolders.tsx` quick-nav di sidebar; FilesPage baca param `?folder=` |
-| #9 Resumable upload | ⬜ Belum dimulai | — | — |
+| #9 Resumable upload | ⬜ Ditunda | — | Referensi 9drive khusus Google Drive (proxy ke `googleapis.com/upload/drive/v3` resumable session, butuh `googleSessionUri` + kredensial asli) — tidak dapat diuji tanpa kredensial Google; keputusan user 2026-08-12: tetap pending |
 | #10 In-app API docs | ✅ | `d86a08c` (merge `6947eae`) | `ApiDocsPage.tsx` (Overview, Authentication `9d_live_`, `POST /api/v1/uploads`, cURL + JS fetch examples, error table 400/401/500, API Key Management quick ref); `apiDocs/CodeBlock.tsx` (copy-to-clipboard) + `apiDocs/EndpointCard.tsx`; route `/app/api-docs` + nav sidebar; i18n `apiDocs.*` (45 keys) en/id parity |
 
 **Status legend**: ⬜ Belum dimulai · 🔄 Sedang dikerjakan · ✅ Selesai (committed + pushed)
