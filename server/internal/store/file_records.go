@@ -386,7 +386,11 @@ func DeleteFileEverywhere(ctx context.Context, tx bun.IDB, fileID uuid.UUID) err
 	if _, err := tx.NewDelete().Model((*model.File)(nil)).Where("id = ?", fileID).Exec(ctx); err != nil {
 		return fmt.Errorf("store: deleting file: %w", err)
 	}
-	// blob_locations + file_blobs cascade on blob delete
+	// blob_locations must be removed explicitly — SQLite has no FK cascade,
+	// so orphaned rows would block same-name re-uploads (UNIQUE blob_id+store_id).
+	if _, err := tx.NewDelete().Model((*model.BlobLocation)(nil)).Where("blob_id = ?", f.BlobID).Exec(ctx); err != nil {
+		return fmt.Errorf("store: deleting blob locations: %w", err)
+	}
 	if _, err := tx.NewDelete().Model((*model.FileBlob)(nil)).Where("id = ?", f.BlobID).Exec(ctx); err != nil {
 		return fmt.Errorf("store: deleting blob: %w", err)
 	}

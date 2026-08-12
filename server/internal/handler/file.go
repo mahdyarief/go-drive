@@ -587,12 +587,17 @@ func moveObject(ctx context.Context, st storage.Storage, oldKey, newKey, mime st
 	if err != nil {
 		return fmt.Errorf("downloading %s: %w", oldKey, err)
 	}
-	defer r.Close()
 	if mime == "" {
 		mime = "application/octet-stream"
 	}
 	if err := st.Upload(ctx, newKey, r, mime); err != nil {
+		r.Close()
 		return fmt.Errorf("uploading %s: %w", newKey, err)
+	}
+	// Close the source handle before Delete: on Windows os.Remove fails while
+	// the file is still open ("being used by another process").
+	if err := r.Close(); err != nil {
+		return fmt.Errorf("closing %s: %w", oldKey, err)
 	}
 	return st.Delete(ctx, oldKey)
 }
