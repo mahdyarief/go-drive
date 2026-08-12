@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { usePreferencesStore, type Theme } from '@/store/preferences'
+import { SystemStatusDropdown } from '@/components/app/SystemStatusDropdown'
 import { Moon, Search, Sun } from 'lucide-react'
 
 const NEXT_THEME: Record<Theme, Theme> = { light: 'dark', dark: 'light', system: 'light' }
@@ -38,6 +39,7 @@ export function AppHeader() {
           aria-label={t('app.searchPlaceholder')}
         />
       </form>
+      <SystemStatusDropdown />
       <Button
         variant="ghost"
         size="icon"

@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumb, BreadcrumbItem as BCItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { X } from 'lucide-react'
-import { FOLDER_COLORS, VIEW_MODE_KEY, copyToClipboard } from './files/files'
+import { FOLDER_COLORS, VIEW_MODE_KEY, buildSearchUrl, copyToClipboard } from './files/files'
 import type {
   BreadcrumbsData,
   DownloadUrlData,
@@ -19,6 +19,7 @@ import type {
   FolderListData,
   ItemActions,
   ItemField,
+  SearchFilters,
   SearchResultsData,
   TagsData,
   ViewMode,
@@ -26,7 +27,9 @@ import type {
 import { FileDetailsDrawer } from './files/FileDetailsDrawer'
 import { FileDialogs } from './files/FileDialogs'
 import { FileDropZone } from './files/FileDropZone'
+import { FileEmptyState } from './files/FileEmptyState'
 import { FileList } from './files/FileList'
+import { FileListSkeleton } from './files/FileListSkeleton'
 import { FileToolbar } from './files/FileToolbar'
 import { StorageUsageCard } from './files/StorageUsageCard'
 
@@ -44,6 +47,7 @@ export default function FilesPage() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState(initialQuery)
   const [activeSearch, setActiveSearch] = useState(initialQuery)
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({})
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY)
     return saved === 'grid' ? 'grid' : 'list'
@@ -85,12 +89,8 @@ export default function FilesPage() {
   })
 
   const searchQuery = useQuery({
-    queryKey: ['t', 'files', 'search', orgSlug, activeSearch],
-    queryFn: () =>
-      tenantApi<SearchResultsData>(
-        `/api/t/files/search?q=${encodeURIComponent(activeSearch)}`,
-        orgSlug!,
-      ),
+    queryKey: ['t', 'files', 'search', orgSlug, activeSearch, searchFilters],
+    queryFn: () => tenantApi<SearchResultsData>(buildSearchUrl(activeSearch, searchFilters), orgSlug!),
     enabled: !!orgSlug && activeSearch.trim().length > 0,
   })
 
@@ -343,6 +343,8 @@ export default function FilesPage() {
           onNewFolder={() => setCreateOpen(true)}
           onUpload={handleUpload}
           uploadPending={uploadFiles.isPending}
+          filters={searchFilters}
+          onFiltersChange={setSearchFilters}
         />
       </div>
 
@@ -384,9 +386,7 @@ export default function FilesPage() {
                   {t('files.clearSearch')}
                 </Button>
               </div>
-              {searchQuery.isPending && (
-                <p className="text-sm text-muted-foreground py-8 text-center">...</p>
-              )}
+              {searchQuery.isPending && <FileListSkeleton viewMode={viewMode} />}
               {searchQuery.isError && (
                 <p className="text-sm text-destructive py-8 text-center">{t('files.loadError')}</p>
               )}
@@ -408,17 +408,16 @@ export default function FilesPage() {
             </div>
           ) : (
             <>
-              {(foldersQuery.isPending || filesQuery.isPending) && (
-                <p className="text-sm text-muted-foreground py-8 text-center">...</p>
-              )}
+              {(foldersQuery.isPending || filesQuery.isPending) && <FileListSkeleton viewMode={viewMode} />}
               {(foldersQuery.isError || filesQuery.isError) && (
                 <p className="text-sm text-destructive py-8 text-center">{t('files.loadError')}</p>
               )}
               {!foldersQuery.isPending && !filesQuery.isPending && folders.length === 0 && files.length === 0 && (
-                <div className="py-12 text-center">
-                  <p className="text-sm text-muted-foreground">{t('files.empty')}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{t('files.emptyHint')}</p>
-                </div>
+                <FileEmptyState
+                  onNewFolder={() => setCreateOpen(true)}
+                  onUpload={handleUpload}
+                  uploadPending={uploadFiles.isPending}
+                />
               )}
               <FileList
                 viewMode={viewMode}

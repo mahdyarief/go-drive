@@ -390,12 +390,33 @@ func SearchFiles(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusBadRequest, "q is required")
 			return
 		}
+		qb := tx.NewSelect().Model((*model.File)(nil)).
+			Where("status = 'ready' AND LOWER(name) LIKE LOWER(?)", "%"+q+"%")
+		if kind := strings.TrimSpace(c.Query("kind")); kind != "" {
+			qb = qb.Where("LOWER(mime_type) LIKE LOWER(?)", kind+"%")
+		}
+		if v := strings.TrimSpace(c.Query("minSize")); v != "" {
+			if min, err := strconv.ParseInt(v, 10, 64); err == nil && min >= 0 {
+				qb = qb.Where("size >= ?", min)
+			}
+		}
+		if v := strings.TrimSpace(c.Query("maxSize")); v != "" {
+			if max, err := strconv.ParseInt(v, 10, 64); err == nil && max >= 0 {
+				qb = qb.Where("size <= ?", max)
+			}
+		}
+		if v := strings.TrimSpace(c.Query("from")); v != "" {
+			if from, err := time.Parse("2006-01-02", v); err == nil {
+				qb = qb.Where("created_at >= ?", from)
+			}
+		}
+		if v := strings.TrimSpace(c.Query("to")); v != "" {
+			if to, err := time.Parse("2006-01-02", v); err == nil {
+				qb = qb.Where("created_at < ?", to.AddDate(0, 0, 1))
+			}
+		}
 		var files []model.File
-		if err := tx.NewSelect().Model((*model.File)(nil)).
-			Where("status = 'ready' AND LOWER(name) LIKE LOWER(?)", "%"+q+"%").
-			Order("name ASC").
-			Limit(100).
-			Scan(ctx, &files); err != nil {
+		if err := qb.Order("name ASC").Limit(100).Scan(ctx, &files); err != nil {
 			Err(c, http.StatusInternalServerError, "searching files: "+err.Error())
 			return
 		}

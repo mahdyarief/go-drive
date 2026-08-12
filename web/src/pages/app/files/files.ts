@@ -30,6 +30,26 @@ export interface SearchResultsData {
   tags?: Record<string, Tag[]>
 }
 
+// Search filters forwarded to GET /api/t/files/search. kind is a mime-type
+// prefix (e.g. "image/"), sizes are bytes, dates are YYYY-MM-DD.
+export interface SearchFilters {
+  kind?: string
+  minSize?: string
+  maxSize?: string
+  from?: string
+  to?: string
+}
+
+export const buildSearchUrl = (q: string, filters: SearchFilters): string => {
+  const params = new URLSearchParams({ q })
+  if (filters.kind) params.set('kind', filters.kind)
+  if (filters.minSize) params.set('minSize', filters.minSize)
+  if (filters.maxSize) params.set('maxSize', filters.maxSize)
+  if (filters.from) params.set('from', filters.from)
+  if (filters.to) params.set('to', filters.to)
+  return `/api/t/files/search?${params.toString()}`
+}
+
 export type ViewMode = 'list' | 'grid'
 
 export const VIEW_MODE_KEY = 'filesViewMode'
