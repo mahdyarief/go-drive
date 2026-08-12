@@ -79,5 +79,34 @@ func RunPublicMigrations(ctx context.Context, db *bun.DB) error {
 		return fmt.Errorf("creating link_tokens table: %w", err)
 	}
 
+	// External API keys — cross-tenant credentials for the public upload API.
+	// Stored in the PUBLIC schema (not tenant schemas) so the API-key
+	// middleware can resolve the owning org from the key hash BEFORE opening
+	// any tenant transaction. The full secret is never stored; only its
+	// SHA-256 hash (key_hash) is persisted.
+	apiKeysDDL := `
+		CREATE TABLE IF NOT EXISTS api_keys (
+			id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+			org_slug text NOT NULL,
+			user_id text NOT NULL,
+			name text NOT NULL,
+			key_prefix text NOT NULL,
+			key_hash text NOT NULL UNIQUE,
+			scopes jsonb NOT NULL DEFAULT '[]',
+			status text NOT NULL DEFAULT 'active',
+			last_used_at timestamptz,
+			expires_at timestamptz,
+			revoked_at timestamptz,
+			created_at timestamptz NOT NULL DEFAULT now()
+		);
+		CREATE INDEX IF NOT EXISTS idx_api_keys_org ON api_keys (org_slug);
+	`
+	if isSQLite(db) {
+		apiKeysDDL = sqliteDDL.Replace(apiKeysDDL)
+	}
+	if _, err := db.ExecContext(ctx, apiKeysDDL); err != nil {
+		return fmt.Errorf("creating api_keys table: %w", err)
+	}
+
 	return nil
 }
