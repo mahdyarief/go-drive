@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button'
 import { PanelLeftClose, PanelLeft, LogOut, Home, LayoutDashboard, X, Menu, Folder, Database, Link2, Users, Palette, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebarCollapsed } from '@/lib/useSidebarCollapsed'
+import { AppHeader } from '@/components/app/AppHeader'
+import { StorageUsageSidebar } from '@/components/app/StorageUsageSidebar'
+import { UploadPanel } from '@/components/app/UploadPanel'
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isCollapsed, toggleCollapsed] = useSidebarCollapsed()
@@ -98,6 +101,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </NavLink>
         </nav>
 
+        <StorageUsageSidebar collapsed={isCollapsed} />
+
         <div className="border-t border-border p-3">
           <div className={cn('flex items-center gap-2', isCollapsed && 'md:justify-center')}>
             <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
@@ -124,10 +129,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </Button>
         </div>
+        <AppHeader />
         <div className="mx-auto max-w-6xl p-4 md:p-6">
           {children}
         </div>
       </main>
+      <UploadPanel />
     </div>
   )
 }

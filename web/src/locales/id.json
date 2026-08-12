@@ -5,7 +5,9 @@
     "cancel": "Batal",
     "tenantStatusDescription": "Demo endpoint tenant-scoped — data ini berasal dari GET /api/t/status dengan header X-Org-Slug.",
     "tenantContext": "Konteks Tenant",
-    "tenantIsolationDemo": "Setiap organisasi memiliki schema Postgres sendiri (schema-per-tenant). Halaman ini menunjukkan schema tempat sesi Anda diisolasi."
+    "tenantIsolationDemo": "Setiap organisasi memiliki schema Postgres sendiri (schema-per-tenant). Halaman ini menunjukkan schema tempat sesi Anda diisolasi.",
+    "searchPlaceholder": "Cari file...",
+    "toggleTheme": "Ganti tema"
   },
   "auth": {
     "signIn": "Masuk",
@@ -448,7 +450,12 @@
     "updatedAt": "Diperbarui",
     "storageProvider": "Penyimpanan",
     "status": "Status",
-    "checksum": "Checksum"
+    "checksum": "Checksum",
+    "uploads": "{{count}} unggahan",
+    "collapse": "Tutup",
+    "expand": "Buka",
+    "clearUploads": "Bersihkan unggahan",
+    "dismiss": "Tutup"
   },
   "stores": {
     "title": "Penyimpanan",

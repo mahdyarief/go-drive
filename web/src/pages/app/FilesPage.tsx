@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { tenantApi } from '@/lib/api'
 import type { Folder, LockerFile, ShareLink, StorageUsage, Tag } from '@/lib/types'
 import { useOrgStore } from '@/store/org'
+import { useUploadStore } from '@/store/upload'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -25,7 +26,6 @@ import type {
 import { FileDialogs } from './files/FileDialogs'
 import { FileList } from './files/FileList'
 import { FileToolbar } from './files/FileToolbar'
-import { UploadProgressCard, type UploadProgress } from './files/UploadProgressCard'
 import { StorageUsageCard } from './files/StorageUsageCard'
 
 export default function FilesPage() {
@@ -34,10 +34,14 @@ export default function FilesPage() {
   const navigate = useNavigate()
   const currentOrg = useOrgStore((s) => s.currentOrg)
   const orgSlug = currentOrg?.slug
+  const addUpload = useUploadStore((s) => s.add)
+  const updateUpload = useUploadStore((s) => s.update)
 
+  const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') ?? ''
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
-  const [searchInput, setSearchInput] = useState('')
-  const [activeSearch, setActiveSearch] = useState('')
+  const [searchInput, setSearchInput] = useState(initialQuery)
+  const [activeSearch, setActiveSearch] = useState(initialQuery)
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY)
     return saved === 'grid' ? 'grid' : 'list'
@@ -49,7 +53,6 @@ export default function FilesPage() {
   const [deleteTarget, setDeleteTarget] = useState<ItemField | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: ItemField } | null>(null)
   const [tagTarget, setTagTarget] = useState<LockerFile | null>(null)
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
@@ -174,14 +177,21 @@ export default function FilesPage() {
       const form = new FormData()
       form.append('file', files[0])
       if (currentFolderId) form.append('folderId', currentFolderId)
-      setUploadProgress({ name: files[0].name, percent: 0 })
+      const id = crypto.randomUUID()
+      addUpload({ id, name: files[0].name, percent: 0, status: 'uploading' })
       return tenantApi<unknown>('/api/t/upload', orgSlug!, { method: 'POST', body: form })
+        .then((res) => {
+          updateUpload(id, { percent: 100, status: 'done' })
+          return res
+        })
+        .catch((err) => {
+          updateUpload(id, { status: 'error' })
+          throw err
+        })
     },
     onSuccess: () => {
       invalidate()
-      setUploadProgress(null)
     },
-    onError: () => setUploadProgress(null),
   })
 
   const download = useMutation({
@@ -326,8 +336,6 @@ export default function FilesPage() {
           uploadPending={uploadFiles.isPending}
         />
       </div>
-
-      <UploadProgressCard progress={uploadProgress} />
 
       <Card>
         <CardHeader className="pb-3">

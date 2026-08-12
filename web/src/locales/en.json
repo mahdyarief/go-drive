@@ -5,7 +5,9 @@
     "cancel": "Cancel",
     "tenantStatusDescription": "Tenant-scoped endpoint demo — this data comes from GET /api/t/status with the X-Org-Slug header.",
     "tenantContext": "Tenant Context",
-    "tenantIsolationDemo": "Each organization gets its own Postgres schema (schema-per-tenant). This page shows which schema your session is isolated to."
+    "tenantIsolationDemo": "Each organization gets its own Postgres schema (schema-per-tenant). This page shows which schema your session is isolated to.",
+    "searchPlaceholder": "Search files...",
+    "toggleTheme": "Toggle theme"
   },
   "auth": {
     "signIn": "Sign In",
@@ -448,7 +450,12 @@
     "updatedAt": "Updated",
     "storageProvider": "Storage",
     "status": "Status",
-    "checksum": "Checksum"
+    "checksum": "Checksum",
+    "uploads": "{{count}} uploads",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "clearUploads": "Clear uploads",
+    "dismiss": "Dismiss"
   },
   "stores": {
     "title": "Storage Stores",
