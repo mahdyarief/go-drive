@@ -211,6 +211,32 @@ func ListFiles(db *bun.DB) gin.HandlerFunc {
 	}
 }
 
+// RecentFiles returns the most recently updated files across all folders,
+// used by the dashboard's "recent files" section. Dot-folder files are excluded.
+func RecentFiles(db *bun.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tx := c.MustGet("tenant_tx").(bun.Tx)
+		ctx := c.Request.Context()
+
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "8"))
+		if limit < 1 || limit > 50 {
+			limit = 8
+		}
+
+		var files []model.File
+		if err := tx.NewSelect().Model((*model.File)(nil)).
+			Where("status = 'ready' AND name NOT LIKE '.%'").
+			Order("updated_at DESC").
+			Limit(limit).
+			Scan(ctx, &files); err != nil {
+			Err(c, http.StatusInternalServerError, "listing recent files: "+err.Error())
+			return
+		}
+
+		Success(c, gin.H{"files": files})
+	}
+}
+
 // UpdateFile renames/moves a file. Body: { name?, folderId? }.
 // When the display path changes the object is physically relocated on the
 // primary store and object_key/blob_location rows are kept in sync.

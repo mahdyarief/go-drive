@@ -43,9 +43,9 @@ export default function FilesPage() {
   const orgSlug = currentOrg?.slug
   const uploadBatch = useUploadStore((s) => s.uploadBatch)
 
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const initialQuery = searchParams.get('q') ?? ''
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(searchParams.get('folder') ?? null)
+  const currentFolderId = searchParams.get('folder')
   const [searchInput, setSearchInput] = useState(initialQuery)
   const [activeSearch, setActiveSearch] = useState(initialQuery)
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({})
@@ -251,7 +251,16 @@ export default function FilesPage() {
 
   const handleNav = (id: string | null) => {
     batchOps.clearSelection()
-    setCurrentFolderId(id)
+    setActiveSearch('')
+    setSearchInput('')
+    const next = new URLSearchParams(searchParams)
+    if (id) {
+      next.set('folder', id)
+    } else {
+      next.delete('folder')
+    }
+    next.delete('q')
+    setSearchParams(next)
   }
 
   const toggleView = (mode: ViewMode) => {

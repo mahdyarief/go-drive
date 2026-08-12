@@ -15,10 +15,9 @@ import UsersPage from '@/pages/admin/users'
 import AdminSettingsPage from '@/pages/admin/settings'
 import LoginPage from '@/pages/LoginPage'
 import SignupPage from '@/pages/SignupPage'
-import HomePage from '@/pages/HomePage'
 import OrgsPage from '@/pages/OrgsPage'
 import OrgSettingsPage from '@/pages/OrgSettingsPage'
-import TenantStatusPage from '@/pages/app/TenantStatusPage'
+import DashboardPage from '@/pages/app/DashboardPage'
 import FilesPage from '@/pages/app/FilesPage'
 import FilePreviewPage from '@/pages/app/FilePreviewPage'
 import StoresPage from '@/pages/app/StoresPage'
@@ -99,7 +98,7 @@ function App() {
               element={
                 <ProtectedRoute>
                   <OrgGuard>
-                    <HomePage />
+                    <Navigate to="/app/status" replace />
                   </OrgGuard>
                 </ProtectedRoute>
               }
@@ -117,7 +116,7 @@ function App() {
               }
             >
               <Route index element={<Navigate to="status" replace />} />
-              <Route path="status" element={<TenantStatusPage />} />
+              <Route path="status" element={<DashboardPage />} />
               <Route path="files" element={<FilesPage />} />
               <Route path="files/preview/:fileId" element={<FilePreviewPage />} />
               <Route path="settings/stores" element={<StoresPage />} />

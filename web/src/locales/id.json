@@ -648,7 +648,7 @@
   },
   "links": {
     "title": "Tautan",
-    "description": "Deskripsi",
+    "description": "Bagikan file, kumpulkan upload, dan lacak aktivitas melalui link yang bisa dibagikan.",
     "tabShare": "Tautan Berbagi",
     "tabUpload": "Tautan Unggah",
     "tabTracked": "Tautan Terlacak",
@@ -696,7 +696,18 @@
     "linkSaved": "Tautan disimpan.",
     "loadError": "Gagal memuat tautan.",
     "actionError": "Aksi gagal. Silakan coba lagi.",
-    "expired": "Kadaluarsa"
+    "expired": "Kadaluarsa",
+    "tabShareHelp": "Buat link agar orang lain bisa melihat atau mengunduh file/folder yang Anda pilih.",
+    "tabUploadHelp": "Buat link agar orang lain bisa mengirim file langsung ke folder yang Anda pilih.",
+    "tabTrackedHelp": "Buat link dan lacak siapa yang melihat, mengunduh, dan membukanya.",
+    "namePlaceholder": "cth. Brosur Q1",
+    "fileIdPlaceholder": "Tempel ID file dari halaman Files",
+    "folderIdPlaceholder": "Tempel ID folder dari halaman Files",
+    "descriptionPlaceholder": "Untuk apa link ini?",
+    "expiresHint": "Kosongkan agar tidak pernah kedaluwarsa.",
+    "limitPlaceholder": "Kosongkan untuk tanpa batas",
+    "maxFileSizePlaceholder": "cth. 10485760 (10 MB dalam bytes)",
+    "maxFileSizeHint": "Batas ukuran dalam bytes. Kosongkan untuk tanpa batas (maks 100 MB per file)."
   },
   "public": {
     "sharedTitle": "File yang dibagikan",
@@ -793,5 +804,20 @@
   "preview": {
     "copyLink": "Salin tautan pratinjau",
     "copied": "Tersalin"
+  },
+  "dashboard": {
+    "welcome": "Selamat datang kembali, {{name}}",
+    "subtitle": "Ringkasan workspace Anda",
+    "uploadFiles": "Upload file",
+    "newFolder": "Folder baru",
+    "openLinks": "Buka links",
+    "recentFolders": "Folder terbaru",
+    "recentFiles": "File terbaru",
+    "recentActivity": "Aktivitas terbaru",
+    "viewAll": "Lihat semua",
+    "error": "Gagal memuat data dashboard.",
+    "emptyFolders": "Belum ada folder. Buat satu dari halaman Files.",
+    "emptyFiles": "Belum ada file. Upload file pertama Anda untuk memulai.",
+    "emptyActivity": "Belum ada aktivitas terbaru."
   }
 }

@@ -648,7 +648,7 @@
   },
   "links": {
     "title": "Links",
-    "description": "Description",
+    "description": "Share files, collect uploads, and track engagement with shareable links.",
     "tabShare": "Share Links",
     "tabUpload": "Upload Links",
     "tabTracked": "Tracked Links",
@@ -696,7 +696,18 @@
     "linkSaved": "Link saved.",
     "loadError": "Failed to load links.",
     "actionError": "Action failed. Please try again.",
-    "expired": "Expired"
+    "expired": "Expired",
+    "tabShareHelp": "Create a link so others can view or download a file or folder you choose.",
+    "tabUploadHelp": "Create a link so others can send files directly into a folder you choose.",
+    "tabTrackedHelp": "Create a link and track who views, downloads, and opens it.",
+    "namePlaceholder": "e.g. Q1 brochure",
+    "fileIdPlaceholder": "Paste the file ID from the Files page",
+    "folderIdPlaceholder": "Paste the folder ID from the Files page",
+    "descriptionPlaceholder": "What is this link for?",
+    "expiresHint": "Leave empty for no expiry.",
+    "limitPlaceholder": "Leave empty for no limit",
+    "maxFileSizePlaceholder": "e.g. 10485760 (10 MB in bytes)",
+    "maxFileSizeHint": "Size limit in bytes. Leave empty for no limit (max 100 MB per file)."
   },
   "public": {
     "sharedTitle": "Shared files",
@@ -793,5 +804,20 @@
   "preview": {
     "copyLink": "Copy preview link",
     "copied": "Copied"
+  },
+  "dashboard": {
+    "welcome": "Welcome back, {{name}}",
+    "subtitle": "Your workspace overview",
+    "uploadFiles": "Upload files",
+    "newFolder": "New folder",
+    "openLinks": "Open links",
+    "recentFolders": "Recent folders",
+    "recentFiles": "Recent files",
+    "recentActivity": "Recent activity",
+    "viewAll": "View all",
+    "error": "Failed to load dashboard data.",
+    "emptyFolders": "No folders yet. Create one from the Files page.",
+    "emptyFiles": "No files yet. Upload your first file to get started.",
+    "emptyActivity": "No recent activity yet."
   }
 }
