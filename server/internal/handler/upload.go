@@ -61,8 +61,12 @@ func UploadFile(db *bun.DB) gin.HandlerFunc {
 		uploaded := make([]uploadedFile, 0, len(headers))
 		failed := make([]failedUpload, 0)
 
+		// Track bytes reserved per store across the batch so the routing
+		// policy does not pile every file of one batch onto a single store.
+		reserved := make(map[uuid.UUID]int64)
+
 		for _, h := range headers {
-			f, err := uploadOne(c, tx, userID, folderID, h)
+			f, err := uploadOne(c, tx, userID, folderID, h, reserved)
 			if err != nil {
 				failed = append(failed, failedUpload{Name: filepath.Base(h.Filename), Error: err.Error()})
 				continue
@@ -74,7 +78,7 @@ func UploadFile(db *bun.DB) gin.HandlerFunc {
 	}
 }
 
-func uploadOne(c *gin.Context, tx bun.Tx, userID string, folderID *uuid.UUID, h *multipart.FileHeader) (*uploadedFile, error) {
+func uploadOne(c *gin.Context, tx bun.Tx, userID string, folderID *uuid.UUID, h *multipart.FileHeader, reserved map[uuid.UUID]int64) (*uploadedFile, error) {
 	ctx := c.Request.Context()
 
 	if h.Size > store.MaxFileSize {
@@ -82,11 +86,13 @@ func uploadOne(c *gin.Context, tx bun.Tx, userID string, folderID *uuid.UUID, h 
 	}
 
 	// Resolve the write store for this workspace (primary in replicate mode,
-	// quota-aware in cumulative mode).
-	s, err := store.ResolveUploadStore(ctx, tx, h.Size)
+	// policy-aware quota-aware in cumulative mode). Reserved bytes from
+	// earlier files in the batch reduce the chosen store's available space.
+	s, err := store.ResolveUploadStoreReserved(ctx, tx, h.Size, reserved)
 	if err != nil {
 		return nil, fmt.Errorf("no active storage configured: %w", err)
 	}
+	reserved[s.ID] += h.Size
 
 	// Build the object key (display path, e.g. docs/reports/q1.pdf).
 	name := filepath.Base(h.Filename)

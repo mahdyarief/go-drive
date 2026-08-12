@@ -129,6 +129,14 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			created_at timestamptz NOT NULL DEFAULT now(),
 			updated_at timestamptz NOT NULL DEFAULT now()
 		)`),
+		q(`CREATE TABLE IF NOT EXISTS %sstore_routing_policy (
+			workspace_id uuid PRIMARY KEY,
+			mode text NOT NULL DEFAULT 'most_available',
+			priority_store_ids jsonb NOT NULL DEFAULT '[]',
+			round_robin_cursor integer NOT NULL DEFAULT 0,
+			created_at timestamptz NOT NULL DEFAULT now(),
+			updated_at timestamptz NOT NULL DEFAULT now()
+		)`),
 
 		// File blobs + locations
 		q(`CREATE TABLE IF NOT EXISTS %sfile_blobs (

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -101,10 +102,27 @@ func ResolveWriteStore(ctx context.Context, tx bun.IDB, size int64) (*model.Stor
 	return &stores[0], nil
 }
 
+// quotaRefreshStaleAfter is how old a store's last_synced_at must be before
+// ResolveUploadStoreReserved re-measures its quota from the provider.
+const quotaRefreshStaleAfter = 5 * time.Minute
+
 // ResolveUploadStore returns the store a new upload should target given the
 // workspace's storage mode: the primary store in replicate mode, or the
-// quota-aware write store in cumulative mode.
+// policy-aware quota-aware write store in cumulative mode.
 func ResolveUploadStore(ctx context.Context, tx bun.IDB, size int64) (*model.Store, error) {
+	return ResolveUploadStoreReserved(ctx, tx, size, nil)
+}
+
+// routingCandidate pairs a store with its estimated available bytes.
+type routingCandidate struct {
+	store *model.Store
+	avail int64
+}
+
+// ResolveUploadStoreReserved is ResolveUploadStore with batch-aware
+// reservations: reserved[storeID] bytes are subtracted from each store's
+// available space so a single multi-file batch cannot overload one store.
+func ResolveUploadStoreReserved(ctx context.Context, tx bun.IDB, size int64, reserved map[uuid.UUID]int64) (*model.Store, error) {
 	mode, err := GetStorageMode(ctx, tx)
 	if err != nil {
 		return nil, err
@@ -112,7 +130,149 @@ func ResolveUploadStore(ctx context.Context, tx bun.IDB, size int64) (*model.Sto
 	if mode == "replicate" {
 		return ResolvePrimaryStore(ctx, tx)
 	}
-	return ResolveWriteStore(ctx, tx, size)
+
+	// Load the routing policy; absent rows behave as the default
+	// most_available policy (i.e. the original ResolveWriteStore behavior).
+	var policy model.StoreRoutingPolicy
+	policyMode := "most_available"
+	var priorityIDs []uuid.UUID
+	cursor := 0
+	hasPolicy := false
+	if err := tx.NewSelect().Model(&policy).Limit(1).Scan(ctx); err == nil {
+		hasPolicy = true
+		if policy.Mode != "" {
+			policyMode = policy.Mode
+		}
+		priorityIDs = policy.PriorityStoreIDs
+		cursor = policy.RoundRobinCursor
+	}
+
+	stores := make([]model.Store, 0, 8)
+	if err := tx.NewSelect().Model(&stores).
+		Where("status = 'active' AND write_mode = 'write'").
+		Order("read_priority ASC", "created_at ASC").
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("store: listing write stores: %w", err)
+	}
+	if len(stores) == 0 {
+		return nil, fmt.Errorf("store: no active write store")
+	}
+
+	// Best-effort refresh of stale quotas (last_synced_at older than 5m).
+	refreshStaleQuotas(ctx, tx, stores)
+
+	cands := make([]routingCandidate, 0, len(stores))
+	for i := range stores {
+		s := &stores[i]
+		limit := s.QuotaLimit
+		if s.Provider == "gdrive" {
+			limit = s.ProviderQuotaLimit
+		}
+		avail := int64(math.MaxInt64) - s.QuotaUsed
+		if limit > 0 {
+			avail = limit - s.QuotaUsed
+		}
+		if r := reserved[s.ID]; r > 0 {
+			avail -= r
+		}
+		cands = append(cands, routingCandidate{store: s, avail: avail})
+	}
+
+	// Stores with enough space for this upload.
+	eligible := make([]routingCandidate, 0, len(cands))
+	for _, c := range cands {
+		if c.avail >= size {
+			eligible = append(eligible, c)
+		}
+	}
+
+	switch policyMode {
+	case "round_robin":
+		// When every store is below size, fall back to the one with the most
+		// available space rather than failing.
+		if len(eligible) == 0 {
+			return mostAvailable(cands).store, nil
+		}
+		idx := cursor % len(eligible)
+		if idx < 0 {
+			idx = 0
+		}
+		sel := eligible[idx]
+		// Persist the advanced cursor (best-effort; only when a policy row
+		// already exists — reads never create one).
+		if hasPolicy {
+			_, _ = tx.NewUpdate().Model((*model.StoreRoutingPolicy)(nil)).
+				Set("round_robin_cursor = ?", cursor+1, "updated_at = ?", time.Now()).
+				Where("workspace_id = ?", uuid.Nil).
+				Exec(ctx)
+		}
+		return sel.store, nil
+	case "priority":
+		if len(eligible) > 0 {
+			// First store whose id appears in priority_store_ids (order
+			// matters), else fall back to the most available eligible store.
+			for _, pid := range priorityIDs {
+				for _, c := range eligible {
+					if c.store.ID == pid {
+						return c.store, nil
+					}
+				}
+			}
+			return mostAvailable(eligible).store, nil
+		}
+		return mostAvailable(cands).store, nil
+	default: // most_available
+		return mostAvailable(cands).store, nil
+	}
+}
+
+// mostAvailable returns the candidate with the most available bytes.
+func mostAvailable(cands []routingCandidate) routingCandidate {
+	best := cands[0]
+	for _, c := range cands[1:] {
+		if c.avail > best.avail {
+			best = c
+		}
+	}
+	return best
+}
+
+// refreshStaleQuotas re-measures quotas for stores whose last_synced_at is
+// older than quotaRefreshStaleAfter. Failures are non-fatal: cached values are
+// kept and last_synced_at only advances on success. Only providers that report
+// a real capacity (gdrive) are refreshed — local walks the whole store and S3
+// reports nothing, so both are skipped.
+func refreshStaleQuotas(ctx context.Context, tx bun.IDB, stores []model.Store) {
+	cutoff := time.Now().Add(-quotaRefreshStaleAfter)
+	for i := range stores {
+		s := &stores[i]
+		if s.Provider != "gdrive" {
+			continue
+		}
+		if s.LastSyncedAt != nil && s.LastSyncedAt.After(cutoff) {
+			continue
+		}
+		st, err := BuildStorage(ctx, tx, s)
+		if err != nil {
+			continue
+		}
+		used, limit, err := st.Quota(ctx)
+		if err != nil || limit == 0 {
+			continue
+		}
+		now := time.Now()
+		if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
+			Where("id = ?", s.ID).
+			Set("quota_used = ?", used, "provider_quota_limit = ?", limit).
+			Set("provider_quota_measured_at = ?", now, "last_synced_at = ?", now, "updated_at = ?", now).
+			Exec(ctx); err != nil {
+			continue
+		}
+		s.QuotaUsed = used
+		s.ProviderQuotaLimit = limit
+		s.ProviderQuotaAt = &now
+		s.LastSyncedAt = &now
+	}
 }
 
 // ResolveReadStore returns the store that physically holds the given blob and
