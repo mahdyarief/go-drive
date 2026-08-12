@@ -26,6 +26,7 @@ import type {
 } from './stores/stores'
 import { StoreGroups } from './stores/StoreGroups'
 import { S3KeysCard } from './stores/S3KeysCard'
+import { StorageBreakdownCard } from './stores/StorageBreakdownCard'
 import { StoreFormDialog } from './stores/StoreFormDialog'
 
 export default function StoresPage() {
@@ -262,6 +263,8 @@ export default function StoresPage() {
           </CardContent>
         </Card>
       )}
+
+      <StorageBreakdownCard />
 
       <StoreGroups
         stores={stores}

@@ -628,6 +628,14 @@
     "loadError": "Gagal memuat penyimpanan.",
     "actionError": "Aksi gagal. Silakan coba lagi."
   },
+  "storage": {
+    "breakdownTitle": "Rincian Penyimpanan",
+    "photo": "Foto",
+    "video": "Video",
+    "document": "Dokumen",
+    "total": "Total",
+    "loadError": "Gagal memuat rincian penyimpanan."
+  },
   "links": {
     "title": "Tautan",
     "description": "Kelola tautan berbagi, unggah, dan terlacak.",

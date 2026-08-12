@@ -70,6 +70,7 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		tenant.GET("/status", handler.TenantStatus())
 		tenant.POST("/upload", handler.UploadFile(db))
 		tenant.GET("/storage/usage", handler.StorageUsage(db))
+		tenant.GET("/storage/breakdown", handler.StorageBreakdown(db))
 
 		// Storage backends (M7)
 		tenant.GET("/stores", handler.ListStores(db))

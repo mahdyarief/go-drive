@@ -628,6 +628,14 @@
     "loadError": "Failed to load stores.",
     "actionError": "Action failed. Please try again."
   },
+  "storage": {
+    "breakdownTitle": "Storage breakdown",
+    "photo": "Photos",
+    "video": "Videos",
+    "document": "Documents",
+    "total": "Total",
+    "loadError": "Failed to load storage breakdown."
+  },
   "links": {
     "title": "Links",
     "description": "Manage share, upload and tracked links.",
