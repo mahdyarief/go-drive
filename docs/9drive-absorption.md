@@ -34,11 +34,11 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
   - i18n keys baru di `web/src/locales/en.json` / `id.json`.
 
 ### P1 — Infrastruktur storage
-- [ ] **#2 Upload routing policy**
+- [x] **#2 Upload routing policy**
   - Backend: tabel tenant `store_routing_policy` (mode, priority_store_ids, round_robin_cursor) — tambah CREATE TABLE di `server/internal/migrate/tenant.go` + model di `server/internal/model/`.
   - Handler: `GET/PATCH /api/t/storage/routing-policy`; ubah alur pilih store dari `ResolvePrimaryStore` jadi selector policy-aware (mode most_available / round_robin / priority).
   - Auto-refresh quota stale (>5 menit) + reserved-bytes per batch (lihat `selectAccount()` di 9drive `upload.routes.ts:46`).
-- [ ] **#3 External upload API + API key**
+- [x] **#3 External upload API + API key**
   - Backend: ekstend `s3_api_keys` jadi `api_keys` generik (name, keyPrefix, keyHash, scopes, status, lastUsedAt, expiresAt, revokedAt) atau tabel baru; middleware Bearer-hash lookup seperti 9drive `api-key.middleware.ts`.
   - Route baru: `POST /api/v1/uploads` (public, tanpa session — autentikasi via API key), plus CRUD `GET/POST/DELETE /api/t/api-keys`.
   - One-time secret display saat create; hash disimpan di DB.
@@ -61,8 +61,8 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
 | Fitur | Status | Commit | Catatan |
 |---|---|---|---|
 | #1 Multi-upload + progress | ✅ | `2fdc13d` + `c7e857f` | `POST /api/t/upload` multi-file (`files` field, legacy `file` tetap); response `{files,failed}` per-file; XHR progress panel multi-entry (`lib/upload.ts` + `store/upload.ts` `uploadBatch` + `UploadPanel.tsx`) |
-| #2 Upload routing policy | ⬜ Belum dimulai | — | — |
-| #3 External upload API + API key | ⬜ Belum dimulai | — | — |
+| #2 Upload routing policy | ✅ | `4f2f2cd` (merge `ab93973`) | Tabel tenant `store_routing_policy` (mode most_available/round_robin/priority, priority_store_ids, round_robin_cursor); `GET/PATCH /api/t/storage/routing-policy`; selector policy-aware di `store/file_records.go` (`ResolveUploadStoreReserved` + stale-quota auto-refresh >5 menit); reserved-bytes per batch di `handler/upload.go` |
+| #3 External upload API + API key | ✅ | `06cdc4e` (merge `ab93973`) | Tabel `api_keys` public schema (org_slug, key_prefix, key_hash SHA-256, scopes, status, revoked_at); `POST /api/v1/uploads` via `RequireAPIKey` + `APIKeyTenantTx`; CRUD `/api/t/api-keys`; secret `9d_live_` + 40 hex one-time display |
 | #4 Storage breakdown | ⬜ Belum dimulai | — | — |
 | #5 Batch file ops | ⬜ Belum dimulai | — | — |
 | #6 Audit log | ⬜ Belum dimulai | — | — |
