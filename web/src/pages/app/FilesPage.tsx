@@ -24,6 +24,8 @@ import type {
   TagsData,
   ViewMode,
 } from './files/files'
+import { BatchFileBar } from './files/BatchFileBar'
+import { useBatchFileOps } from './files/batchOps'
 import { FileDetailsDrawer } from './files/FileDetailsDrawer'
 import { FileDialogs } from './files/FileDialogs'
 import { FileDropZone } from './files/FileDropZone'
@@ -66,6 +68,8 @@ export default function FilesPage() {
   const [shareTarget, setShareTarget] = useState<ItemField | null>(null)
   const [copied, setCopied] = useState(false)
   const [detailsTarget, setDetailsTarget] = useState<ItemField | null>(null)
+
+  const batchOps = useBatchFileOps(orgSlug)
 
   const foldersQuery = useQuery({
     queryKey: ['t', 'folders', orgSlug, currentFolderId],
@@ -246,6 +250,7 @@ export default function FilesPage() {
   }
 
   const handleNav = (id: string | null) => {
+    batchOps.clearSelection()
     setCurrentFolderId(id)
   }
 
@@ -329,6 +334,8 @@ export default function FilesPage() {
           uploadPending={uploadFiles.isPending}
           filters={searchFilters}
           onFiltersChange={setSearchFilters}
+          selectMode={batchOps.selectMode}
+          onToggleSelectMode={batchOps.toggleSelectMode}
         />
       </div>
 
@@ -388,6 +395,9 @@ export default function FilesPage() {
                 onOpenFile={(file) => navigate(`/app/files/preview/${file.id}`, { state: { file } })}
                 onContextMenu={handleContextMenu}
                 actions={actions}
+                selectMode={batchOps.selectMode}
+                selectedIds={batchOps.selectedIds}
+                onToggleSelect={batchOps.toggleSelect}
               />
             </div>
           ) : (
@@ -412,11 +422,16 @@ export default function FilesPage() {
                 onOpenFile={(file) => navigate(`/app/files/preview/${file.id}`, { state: { file } })}
                 onContextMenu={handleContextMenu}
                 actions={actions}
+                selectMode={batchOps.selectMode}
+                selectedIds={batchOps.selectedIds}
+                onToggleSelect={batchOps.toggleSelect}
               />
             </>
           )}
         </CardContent>
       </Card>
+
+      <BatchFileBar orgSlug={orgSlug ?? ''} ops={batchOps} />
 
       {usageQuery.isSuccess && <StorageUsageCard usage={usageQuery.data} />}
 

@@ -7,7 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { LayoutGrid, List, Plus, Search, SlidersHorizontal, Upload } from 'lucide-react'
+import { CheckSquare, LayoutGrid, List, Plus, Search, SlidersHorizontal, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SearchFilters, ViewMode } from './files'
 
@@ -22,6 +22,8 @@ interface FileToolbarProps {
   uploadPending: boolean
   filters: SearchFilters
   onFiltersChange: (filters: SearchFilters) => void
+  selectMode: boolean
+  onToggleSelectMode: () => void
 }
 
 const KIND_OPTIONS: { value: string; labelKey: string }[] = [
@@ -48,6 +50,8 @@ export function FileToolbar({
   uploadPending,
   filters,
   onFiltersChange,
+  selectMode,
+  onToggleSelectMode,
 }: FileToolbarProps) {
   const { t } = useTranslation()
 
@@ -179,6 +183,15 @@ export function FileToolbar({
           <LayoutGrid className="h-4 w-4" />
         </Button>
       </div>
+      <Button
+        variant={selectMode ? 'secondary' : 'ghost'}
+        size="icon"
+        className="h-8 w-8"
+        aria-label={t('files.selectMode')}
+        onClick={onToggleSelectMode}
+      >
+        <CheckSquare className="h-4 w-4" />
+      </Button>
       <Button variant="outline" onClick={onNewFolder}>
         <Plus className="h-4 w-4 mr-2" />
         {t('files.newFolder')}

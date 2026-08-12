@@ -352,6 +352,150 @@ func DeleteFile(db *bun.DB) gin.HandlerFunc {
 	}
 }
 
+// BatchMoveFiles moves multiple files into a destination folder. The whole
+// batch fails on the first error so the tenant transaction rolls back.
+func BatchMoveFiles(db *bun.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tx := c.MustGet("tenant_tx").(bun.Tx)
+		ctx := c.Request.Context()
+
+		var req struct {
+			IDs      []string `json:"ids"`
+			FolderID string   `json:"folderId"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			Err(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if len(req.IDs) == 0 {
+			Err(c, http.StatusBadRequest, "ids is required")
+			return
+		}
+
+		var newFolder *uuid.UUID
+		if req.FolderID != "" {
+			fid, err := uuid.Parse(req.FolderID)
+			if err != nil {
+				Err(c, http.StatusBadRequest, "invalid folderId")
+				return
+			}
+			if err := tx.NewSelect().Model((*model.Folder)(nil)).Where("id = ?", fid).Scan(ctx, &model.Folder{}); err != nil {
+				Err(c, http.StatusNotFound, "folder not found")
+				return
+			}
+			newFolder = &fid
+		}
+
+		dir := ""
+		var err error
+		if newFolder != nil {
+			dir, err = store.FolderPath(ctx, tx, *newFolder)
+			if err != nil {
+				Err(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+
+		for _, idStr := range req.IDs {
+			id, err := uuid.Parse(idStr)
+			if err != nil {
+				Err(c, http.StatusBadRequest, "invalid file id: "+idStr)
+				return
+			}
+			var f model.File
+			if err := tx.NewSelect().Model(&f).Where("id = ?", id).Scan(ctx); err != nil {
+				Err(c, http.StatusNotFound, "file not found: "+idStr)
+				return
+			}
+			if err := ensureFileNameUnique(ctx, tx, f.Name, newFolder, id); err != nil {
+				Err(c, http.StatusConflict, err.Error())
+				return
+			}
+			newKey := f.Name
+			if dir != "" {
+				newKey = dir + "/" + f.Name
+			}
+			if newKey != f.StoragePath {
+				s, path, err := store.ResolveReadStore(ctx, tx, f.BlobID, f.StoragePath)
+				if err != nil {
+					Err(c, http.StatusInternalServerError, "no active storage configured")
+					return
+				}
+				st, err := store.BuildStorage(ctx, tx, s)
+				if err != nil {
+					Err(c, http.StatusInternalServerError, "building storage: "+err.Error())
+					return
+				}
+				if err := moveObject(ctx, st, path, newKey, f.MimeType); err != nil {
+					Err(c, http.StatusInternalServerError, "moving file: "+err.Error())
+					return
+				}
+			}
+			if _, err := store.RenameFile(ctx, tx, id, f.Name, newFolder, newKey); err != nil {
+				Err(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+		}
+
+		Success(c, gin.H{"moved": len(req.IDs)})
+	}
+}
+
+// BatchDeleteFiles removes multiple files. Missing files are skipped so the
+// operation is idempotent.
+func BatchDeleteFiles(db *bun.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tx := c.MustGet("tenant_tx").(bun.Tx)
+		ctx := c.Request.Context()
+
+		var req struct {
+			IDs []string `json:"ids"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			Err(c, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if len(req.IDs) == 0 {
+			Err(c, http.StatusBadRequest, "ids is required")
+			return
+		}
+
+		deleted := 0
+		for _, idStr := range req.IDs {
+			id, err := uuid.Parse(idStr)
+			if err != nil {
+				Err(c, http.StatusBadRequest, "invalid file id: "+idStr)
+				return
+			}
+			var f model.File
+			if err := tx.NewSelect().Model(&f).Where("id = ?", id).Scan(ctx); err != nil {
+				continue
+			}
+			locs, err := store.BlobLocationsForFile(ctx, tx, f.BlobID)
+			if err != nil {
+				Err(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+			for _, loc := range locs {
+				var s model.Store
+				if err := tx.NewSelect().Model(&s).Where("id = ?", loc.StoreID).Scan(ctx); err != nil {
+					continue
+				}
+				if st, err := store.BuildStorage(ctx, tx, &s); err == nil {
+					_ = st.Delete(ctx, loc.StoragePath)
+				}
+			}
+			if err := store.DeleteFileEverywhere(ctx, tx, id); err != nil {
+				Err(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+			deleted++
+		}
+
+		Success(c, gin.H{"deleted": deleted})
+	}
+}
+
 // SearchFiles returns files matching q by name (transcription fallback M10).
 // GetFile returns a single file by ID. The preview page uses this endpoint so
 // it survives hard refreshes instead of relying on navigation state.

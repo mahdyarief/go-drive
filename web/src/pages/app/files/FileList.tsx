@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { FileStoreInfo, Folder, LockerFile } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
 import { File as FileIcon, Folder as FolderIcon } from 'lucide-react'
@@ -13,6 +14,9 @@ interface FileListProps {
   onOpenFile: (file: LockerFile) => void
   onContextMenu: (e: React.MouseEvent, item: ItemField) => void
   actions: ItemActions
+  selectMode: boolean
+  selectedIds: string[]
+  onToggleSelect: (fileId: string) => void
 }
 
 const folderItem = (folder: Folder): ItemField => ({ id: folder.id, name: folder.name, isFolder: true, folder })
@@ -30,7 +34,12 @@ export function FileList({
   onOpenFile,
   onContextMenu,
   actions,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
 }: FileListProps) {
+  const { t } = useTranslation()
+
   if (viewMode === 'grid') {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -50,22 +59,32 @@ export function FileList({
           </button>
         ))}
         {files.map((file) => (
-          <button
-            key={file.id}
-            type="button"
-            onClick={() => onOpenFile(file)}
-            onContextMenu={(e) => onContextMenu(e, fileItem(file))}
-            className="flex flex-col items-center gap-2 rounded-lg border p-4 hover:bg-accent"
-          >
-            <FileIcon className="h-8 w-8 text-muted-foreground" />
-            <span className="w-full truncate text-center text-sm font-medium">{file.name}</span>
-            <span className="text-xs text-muted-foreground">{formatBytes(file.size)}</span>
-            {(fileStores[file.id] ?? []).slice(0, 1).map((s) => (
-              <span key={s.id} className="text-[10px] text-muted-foreground">
-                {s.name}
-              </span>
-            ))}
-          </button>
+          <div key={file.id} className="relative">
+            <button
+              type="button"
+              onClick={() => onOpenFile(file)}
+              onContextMenu={(e) => onContextMenu(e, fileItem(file))}
+              className="flex w-full flex-col items-center gap-2 rounded-lg border p-4 hover:bg-accent"
+            >
+              <FileIcon className="h-8 w-8 text-muted-foreground" />
+              <span className="w-full truncate text-center text-sm font-medium">{file.name}</span>
+              <span className="text-xs text-muted-foreground">{formatBytes(file.size)}</span>
+              {(fileStores[file.id] ?? []).slice(0, 1).map((s) => (
+                <span key={s.id} className="text-[10px] text-muted-foreground">
+                  {s.name}
+                </span>
+              ))}
+            </button>
+            {selectMode && (
+              <input
+                type="checkbox"
+                aria-label={t('files.selectFile')}
+                checked={selectedIds.includes(file.id)}
+                onChange={() => onToggleSelect(file.id)}
+                className="absolute left-2 top-2 h-4 w-4"
+              />
+            )}
+          </div>
         ))}
       </div>
     )
@@ -99,6 +118,15 @@ export function FileList({
           className="flex items-center gap-3 py-2"
           onContextMenu={(e) => onContextMenu(e, fileItem(file))}
         >
+          {selectMode && (
+            <input
+              type="checkbox"
+              aria-label={t('files.selectFile')}
+              checked={selectedIds.includes(file.id)}
+              onChange={() => onToggleSelect(file.id)}
+              className="h-4 w-4 shrink-0"
+            />
+          )}
           <button
             type="button"
             onClick={() => onOpenFile(file)}
