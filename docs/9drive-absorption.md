@@ -28,7 +28,7 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
 ## 2. Roadmap (urutan prioritas)
 
 ### P0 — Inti UX (dikerjakan lebih dulu)
-- [ ] **#1 Multi-upload batch + progress panel**
+- [x] **#1 Multi-upload batch + progress panel**
   - Backend: upgrade `POST /api/t/upload` (server/internal/handler/upload.go) terima multi-file. Di Go, parse multipart berurutan; kumpulkan `filesMeta` dari field form, lalu stream tiap file ke store. Response `{ files, failed }` per-file status.
   - Frontend: pola `UploadContext` (seperti 9drive `frontend/src/context/UploadContext.tsx`) + panel progress bottom-right; go-drive sudah punya `UploadProgressCard` (refactor c7e22cf) — tinggal dijadikan panel multi-entry.
   - i18n keys baru di `web/src/locales/en.json` / `id.json`.
@@ -60,14 +60,14 @@ Berdasarkan pembacaan README.md, AGENTS.md, `backend/prisma/schema.prisma` (353 
 
 | Fitur | Status | Commit | Catatan |
 |---|---|---|---|
-| #1 Multi-upload + progress | ⬜ Belum dimulai | — | — |
+| #1 Multi-upload + progress | ✅ | `2fdc13d` + `c7e857f` | `POST /api/t/upload` multi-file (`files` field, legacy `file` tetap); response `{files,failed}` per-file; XHR progress panel multi-entry (`lib/upload.ts` + `store/upload.ts` `uploadBatch` + `UploadPanel.tsx`) |
 | #2 Upload routing policy | ⬜ Belum dimulai | — | — |
 | #3 External upload API + API key | ⬜ Belum dimulai | — | — |
 | #4 Storage breakdown | ⬜ Belum dimulai | — | — |
 | #5 Batch file ops | ⬜ Belum dimulai | — | — |
 | #6 Audit log | ⬜ Belum dimulai | — | — |
 | #7 Preview token | ⬜ Belum dimulai | — | — |
-| #8 Recent folders | ⬜ Belum dimulai | — | — |
+| #8 Recent folders | ✅ | `b82aadb` (merge `e6e73d6`) | `GET /api/t/folders/recent?limit=4` (updated_at DESC, default 4); `RecentFolders.tsx` quick-nav di sidebar; FilesPage baca param `?folder=` |
 | #9 Resumable upload | ⬜ Belum dimulai | — | — |
 | #10 In-app API docs | ⬜ Belum dimulai | — | — |
 
