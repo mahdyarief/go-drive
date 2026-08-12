@@ -70,6 +70,17 @@
 - [x] **C2. System status dropdown** di header (ringkasan tenant: jumlah store, status sync, quota) — ganti/duplikat dari TenantStatusPage.
 - [x] **C3. Empty state + loading polish** di FilesPage (ikon besar + CTA, skeleton rows).
 
+### Batch D — Root page & guidance
+- [x] **D1. Dashboard dalam AppLayout (root page)**
+  - Route `/` → `<Navigate to="/app/status" replace />` (tetap dalam ProtectedRoute + OrgGuard); hapus `HomePage.tsx` (boilerplate) + `TenantStatusPage.tsx`.
+  - `DashboardPage.tsx` di `/app/status` + folder `dashboard/`: `DashboardWelcome` (sapaan + quick actions upload ke root via `uploadBatch`/new folder/links), `DashboardStorage` (StorageUsageCard + StorageBreakdownCard), `DashboardRecentFolders` (`/api/t/folders/recent`), `DashboardRecentFiles` (endpoint baru `/api/t/files/recent`), `DashboardRecentActivity` (reuse `ActivityLogRow` dari audit-logs).
+  - Backend: handler `RecentFiles` di `file.go` (lintas folder, `updated_at DESC`, limit clamp 1–50) + route `/files/recent` sebelum `/files/:id`.
+  - i18n `dashboard.*` 13 keys en/id parity.
+- [x] **D2. Guidance + placeholder di /app/links**
+  - `LinksPage.tsx`: strip guidance per-tab (`tabShareHelp`/`tabUploadHelp`/`tabTrackedHelp`) di bawah judul.
+  - `LinkFormDialog.tsx`: placeholder bermakna di semua field (name/fileId/folderId/description/limit), helper text untuk expires + maxFileSize (unit bytes — konfirmasi `uploadlink.go:272`).
+  - i18n `links.*` +12 keys en/id parity.
+
 ---
 
 ## 4. Constraint Multi-Tenancy (wajib dipatuhi)
