@@ -34,6 +34,19 @@ export type ViewMode = 'list' | 'grid'
 
 export const VIEW_MODE_KEY = 'filesViewMode'
 
+// Folder color palette offered in the new-folder dialog and applied to folder
+// tiles; the Folder model stores the chosen hex value.
+export const FOLDER_COLORS = [
+  '#f59e0b',
+  '#ef4444',
+  '#3b82f6',
+  '#10b981',
+  '#8b5cf6',
+  '#ec4899',
+  '#06b6d4',
+  '#64748b',
+] as const
+
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -47,6 +60,7 @@ export interface ItemField {
   name: string
   isFolder: boolean
   file?: LockerFile
+  folder?: Folder
 }
 
 export const copyToClipboard = async (text: string) => {
@@ -60,6 +74,7 @@ export const copyToClipboard = async (text: string) => {
 // ItemActions bundles the handlers that both the per-row dropdown menu and the
 // right-click context menu invoke for a file or folder.
 export interface ItemActions {
+  onDetails: (item: ItemField) => void
   onPreview: (item: ItemField) => void
   onDownload: (item: ItemField) => void
   onTags: (item: ItemField) => void

@@ -455,7 +455,11 @@
     "collapse": "Collapse",
     "expand": "Expand",
     "clearUploads": "Clear uploads",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "dropFiles": "Drop files to upload",
+    "folderColor": "Folder color",
+    "folder": "Folder",
+    "stores": "Stores"
   },
   "stores": {
     "title": "Storage Stores",

@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Download, Eye, FolderInput, MoreVertical, Pencil, Share2, Tag as TagIcon, Trash2 } from 'lucide-react'
+import { Download, Eye, FolderInput, Info, MoreVertical, Pencil, Share2, Tag as TagIcon, Trash2 } from 'lucide-react'
 import type { ItemActions, ItemField } from './files'
 
 interface FileItemActionsProps {
@@ -45,6 +45,10 @@ export function FileItemActions({ item, actions }: FileItemActionsProps) {
             {t('files.tags')}
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem onClick={() => actions.onDetails(item)}>
+          <Info className="h-4 w-4 mr-2" />
+          {t('files.details')}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => actions.onShare(item)}>
           <Share2 className="h-4 w-4 mr-2" />
           {t('files.share')}

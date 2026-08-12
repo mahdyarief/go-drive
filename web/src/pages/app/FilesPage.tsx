@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumb, BreadcrumbItem as BCItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { X } from 'lucide-react'
-import { VIEW_MODE_KEY, copyToClipboard } from './files/files'
+import { FOLDER_COLORS, VIEW_MODE_KEY, copyToClipboard } from './files/files'
 import type {
   BreadcrumbsData,
   DownloadUrlData,
@@ -23,7 +23,9 @@ import type {
   TagsData,
   ViewMode,
 } from './files/files'
+import { FileDetailsDrawer } from './files/FileDetailsDrawer'
 import { FileDialogs } from './files/FileDialogs'
+import { FileDropZone } from './files/FileDropZone'
 import { FileList } from './files/FileList'
 import { FileToolbar } from './files/FileToolbar'
 import { StorageUsageCard } from './files/StorageUsageCard'
@@ -53,12 +55,14 @@ export default function FilesPage() {
   const [deleteTarget, setDeleteTarget] = useState<ItemField | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+  const [newFolderColor, setNewFolderColor] = useState<string>(FOLDER_COLORS[0])
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: ItemField } | null>(null)
   const [tagTarget, setTagTarget] = useState<LockerFile | null>(null)
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [newTagName, setNewTagName] = useState('')
   const [shareTarget, setShareTarget] = useState<ItemField | null>(null)
   const [copied, setCopied] = useState(false)
+  const [detailsTarget, setDetailsTarget] = useState<ItemField | null>(null)
 
   const foldersQuery = useQuery({
     queryKey: ['t', 'folders', orgSlug, currentFolderId],
@@ -119,10 +123,10 @@ export default function FilesPage() {
   }
 
   const createFolder = useMutation({
-    mutationFn: (name: string) =>
+    mutationFn: ({ name, color }: { name: string; color: string }) =>
       tenantApi<{ folder: Folder }>('/api/t/folders', orgSlug!, {
         method: 'POST',
-        body: JSON.stringify({ name, parentId: currentFolderId ?? undefined }),
+        body: JSON.stringify({ name, color, parentId: currentFolderId ?? undefined }),
       }),
     onSuccess: () => {
       invalidate()
@@ -297,6 +301,7 @@ export default function FilesPage() {
   // Item actions shared by the per-row dropdown (FileItemActions) and the
   // right-click context menu (FileDialogs).
   const actions: ItemActions = {
+    onDetails: (item) => setDetailsTarget(item),
     onPreview: (item) => navigate(`/app/files/preview/${item.id}`, { state: { file: item.file } }),
     onDownload: (item) => download.mutate(item.id),
     onTags: (item) => item.file && openTagDialog(item.file),
@@ -318,8 +323,12 @@ export default function FilesPage() {
       : t('files.actionError')
     : null
 
+  const drawerStores = detailsTarget?.file ? (fileStores[detailsTarget.file.id] ?? []) : []
+  const drawerTags = detailsTarget?.file ? ((isSearching ? searchTags : fileTags)[detailsTarget.file.id] ?? []) : []
+
   return (
-    <div className="space-y-6">
+    <FileDropZone onFiles={(droppedFiles) => uploadFiles.mutate(droppedFiles)}>
+      <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t('files.title')}</h1>
@@ -433,8 +442,10 @@ export default function FilesPage() {
         setCreateOpen={setCreateOpen}
         newFolderName={newFolderName}
         setNewFolderName={setNewFolderName}
+        newFolderColor={newFolderColor}
+        setNewFolderColor={setNewFolderColor}
         createFolderPending={createFolder.isPending}
-        onCreateFolder={() => createFolder.mutate(newFolderName.trim())}
+        onCreateFolder={() => createFolder.mutate({ name: newFolderName.trim(), color: newFolderColor })}
         renameTarget={renameTarget}
         setRenameTarget={setRenameTarget}
         renameValue={renameValue}
@@ -475,6 +486,15 @@ export default function FilesPage() {
         setContextMenu={setContextMenu}
         actions={actions}
       />
-    </div>
+
+      <FileDetailsDrawer
+        item={detailsTarget}
+        onClose={() => setDetailsTarget(null)}
+        stores={drawerStores}
+        tags={drawerTags}
+        actions={actions}
+      />
+      </div>
+    </FileDropZone>
   )
 }

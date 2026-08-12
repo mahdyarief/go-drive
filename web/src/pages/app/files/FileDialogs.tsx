@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+import { FOLDER_COLORS } from './files'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +26,8 @@ interface FileDialogsProps {
   setCreateOpen: (open: boolean) => void
   newFolderName: string
   setNewFolderName: (name: string) => void
+  newFolderColor: string
+  setNewFolderColor: (color: string) => void
   createFolderPending: boolean
   onCreateFolder: () => void
   // Rename dialog
@@ -78,7 +82,7 @@ interface FileDialogsProps {
 export function FileDialogs(props: FileDialogsProps) {
   const { t } = useTranslation()
   const {
-    createOpen, setCreateOpen, newFolderName, setNewFolderName, createFolderPending, onCreateFolder,
+    createOpen, setCreateOpen, newFolderName, setNewFolderName, newFolderColor, setNewFolderColor, createFolderPending, onCreateFolder,
     renameTarget, setRenameTarget, renameValue, setRenameValue, renameItemPending, onRenameSubmit,
     moveTarget, setMoveTarget, moveFolderId, setMoveFolderId, moveItemPending, onMoveSubmit, orgSlug,
     tagTarget, setTagTarget, selectedTagIds, setSelectedTagIds, newTagName, setNewTagName,
@@ -106,6 +110,24 @@ export function FileDialogs(props: FileDialogsProps) {
                 onChange={(e) => setNewFolderName(e.target.value)}
                 placeholder={t('files.folderNamePlaceholder')}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('files.folderColor')}</Label>
+              <div className="flex flex-wrap gap-2">
+                {FOLDER_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={color}
+                    onClick={() => setNewFolderColor(color)}
+                    className={cn(
+                      'h-6 w-6 rounded-full border-2 transition-colors',
+                      newFolderColor === color ? 'border-foreground' : 'border-transparent',
+                    )}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -15,7 +15,7 @@ interface FileListProps {
   actions: ItemActions
 }
 
-const folderItem = (folder: Folder): ItemField => ({ id: folder.id, name: folder.name, isFolder: true })
+const folderItem = (folder: Folder): ItemField => ({ id: folder.id, name: folder.name, isFolder: true, folder })
 const fileItem = (file: LockerFile): ItemField => ({ id: file.id, name: file.name, isFolder: false, file })
 
 // FileList renders the current folder's contents as either a compact list or
@@ -42,7 +42,10 @@ export function FileList({
             onContextMenu={(e) => onContextMenu(e, folderItem(folder))}
             className="flex flex-col items-center gap-2 rounded-lg border p-4 hover:bg-accent"
           >
-            <FolderIcon className="h-8 w-8 text-muted-foreground" />
+            <FolderIcon
+              className="h-8 w-8 text-muted-foreground"
+              style={folder.color ? { color: folder.color } : undefined}
+            />
             <span className="w-full truncate text-center text-sm font-medium">{folder.name}</span>
           </button>
         ))}
@@ -81,7 +84,10 @@ export function FileList({
             onClick={() => onOpenFolder(folder.id)}
             className="flex flex-1 items-center gap-3 text-left min-w-0"
           >
-            <FolderIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <FolderIcon
+              className="h-4 w-4 shrink-0 text-muted-foreground"
+              style={folder.color ? { color: folder.color } : undefined}
+            />
             <span className="truncate text-sm font-medium">{folder.name}</span>
           </button>
           <FileItemActions item={folderItem(folder)} actions={actions} />

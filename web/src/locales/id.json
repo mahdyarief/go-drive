@@ -455,7 +455,11 @@
     "collapse": "Tutup",
     "expand": "Buka",
     "clearUploads": "Bersihkan unggahan",
-    "dismiss": "Tutup"
+    "dismiss": "Tutup",
+    "dropFiles": "Lepaskan file untuk mengunggah",
+    "folderColor": "Warna folder",
+    "folder": "Folder",
+    "stores": "Penyimpanan"
   },
   "stores": {
     "title": "Penyimpanan",
