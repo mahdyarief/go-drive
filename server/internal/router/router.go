@@ -39,6 +39,11 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 	r.GET("/api/tracked/:token/download", handler.PublicTrackedDownload(db))
 	r.GET("/api/tracked/:token/raw", handler.PublicTrackedRaw(db))
 
+	// External upload API (M9) — API-key authenticated, no session required.
+	// RequireAPIKey resolves the owning org from the key; APIKeyTenantTx opens
+	// the tenant transaction for that org.
+	r.POST("/api/v1/uploads", middleware.RequireAPIKey(db, "files:upload"), middleware.APIKeyTenantTx(db), handler.PublicUploadByAPIKey(db))
+
 	// Per-tenant Google Drive OAuth callback (PUBLIC — Google redirects the browser here)
 	r.GET("/api/gdrive/store-callback", handler.GDriveStoreCallback())
 
@@ -126,6 +131,11 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		tenant.GET("/s3-keys", handler.ListS3Keys(db))
 		tenant.POST("/s3-keys", handler.CreateS3Key(db))
 		tenant.DELETE("/s3-keys/:id", handler.DeleteS3Key(db))
+
+		// External API keys (M9) — manage upload API credentials
+		tenant.GET("/api-keys", handler.ListAPIKeys(db))
+		tenant.POST("/api-keys", handler.CreateAPIKey(db))
+		tenant.DELETE("/api-keys/:id", handler.DeleteAPIKey(db))
 	}
 
 	// Admin API routes (Bearer + admin role required)
