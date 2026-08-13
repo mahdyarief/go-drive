@@ -82,6 +82,8 @@ func StorageUsage(db *bun.DB) gin.HandlerFunc {
 		// Workspace limit depends on the storage mode: cumulative sums every
 		// active store's quota (each file lives on one store), replicate uses
 		// the primary store's quota (every file is mirrored). 0 = unlimited.
+		// GDrive stores use the live provider capacity (provider_quota_limit)
+		// rather than the app-configured quota_limit, which stays 0.
 		var limit int64
 		mode, err := store.GetStorageMode(ctx, tx)
 		if err != nil {
@@ -94,7 +96,7 @@ func StorageUsage(db *bun.DB) gin.HandlerFunc {
 			}
 		} else if err := tx.NewSelect().Model((*model.Store)(nil)).
 			Where("status = 'active'").
-			ColumnExpr("COALESCE(SUM(quota_limit), 0)").
+			ColumnExpr("COALESCE(SUM(CASE WHEN provider = 'gdrive' THEN provider_quota_limit ELSE quota_limit END), 0)").
 			Scan(ctx, &limit); err != nil {
 			Err(c, http.StatusInternalServerError, "summing store quotas: "+err.Error())
 			return

@@ -21,8 +21,6 @@ interface StoreCardProps {
   setPrimaryPending: boolean
   onTest: (storeId: string) => void
   testPending: boolean
-  onRefreshQuota: (storeId: string) => void
-  refreshQuotaPending: boolean
   onIngest: (storeId: string) => void
   ingestPending: boolean
   onDelete: (store: Store) => void
@@ -41,8 +39,6 @@ export function StoreCard({
   setPrimaryPending,
   onTest,
   testPending,
-  onRefreshQuota,
-  refreshQuotaPending,
   onIngest,
   ingestPending,
   onDelete,
@@ -120,10 +116,6 @@ export function StoreCard({
             <DropdownMenuItem disabled={testPending} onClick={() => onTest(store.id)}>
               <Check className="h-4 w-4 mr-2" />
               {t('stores.testConnection')}
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={refreshQuotaPending} onClick={() => onRefreshQuota(store.id)}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              {t('stores.refreshQuota')}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={ingestPending} onClick={() => onIngest(store.id)}>
               <Zap className="h-4 w-4 mr-2" />
