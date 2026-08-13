@@ -103,21 +103,6 @@ export interface AdminUser {
   quota_allocated: number
 }
 
-export interface GDriveSettings {
-  configured: boolean
-  connected: boolean
-  folder_id: string
-  client_id_masked: string
-  redirect_uri: string
-}
-
-export interface GDriveStorageQuota {
-  limit: number
-  usage: number
-  usage_in_drive: number
-  usage_in_drive_trash: number
-}
-
 // --- Locker (M9) models ---
 
 export interface LockerFile {

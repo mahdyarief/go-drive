@@ -28,6 +28,9 @@ import (
 // user grants consent). It must match the RedirectURL sent to Google.
 const storeGDriveCallbackPath = "/api/gdrive/store-callback"
 
+// oauthStateTTL bounds how long a pending OAuth consent flow stays valid.
+const oauthStateTTL = 10 * time.Minute
+
 // pendingStoreOAuth holds the PKCE verifier + target store until the OAuth
 // callback completes. Scoped to orgSlug so only that tenant can claim it via
 // GDriveStoreComplete (the callback itself is public and must not trust the

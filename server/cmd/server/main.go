@@ -9,7 +9,6 @@ import (
 	"github.com/joho/godotenv"
 
 	"go-drive/server/internal/config"
-	"go-drive/server/internal/handler"
 	"go-drive/server/internal/migrate"
 	"go-drive/server/internal/router"
 )
@@ -29,9 +28,6 @@ func main() {
 	if err := migrate.RunTenantMigrations(context.Background(), db); err != nil {
 		log.Fatalf("Failed to run tenant migrations: %v", err)
 	}
-
-	// Load UI-managed Google Drive credentials from app_settings (if any).
-	handler.LoadGDriveConfigFromDB(context.Background(), db)
 
 	// Serve embedded frontend if static/ was populated at build time
 	var staticFiles fs.FS

@@ -163,13 +163,6 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		admin.PATCH("/users/:id/limit", handler.AdminSetUserLimit(db))
 		admin.DELETE("/users/:id", handler.AdminDeleteUser(db))
 
-		// Google Drive settings (OAuth user flow)
-		admin.GET("/settings/gdrive", handler.AdminGetGDriveSettings(db))
-		admin.GET("/settings/gdrive/storage", handler.AdminGDriveStorage(db))
-		admin.PUT("/settings/gdrive", handler.AdminSaveGDriveSettings(db))
-		admin.POST("/settings/gdrive/auth-url", handler.AdminGDriveAuthURL(db))
-		admin.POST("/settings/gdrive/disconnect", handler.AdminGDriveDisconnect(db))
-
 		// Registration settings
 		admin.GET("/settings/register", handler.AdminGetRegisterSetting(db))
 		admin.PUT("/settings/register", handler.AdminSaveRegisterSetting(db))
@@ -177,9 +170,6 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		// System monitor (host + process resource usage)
 		admin.GET("/system", handler.AdminSystemInfo())
 	}
-
-	// Google Drive OAuth callback (PUBLIC — Google redirects here after consent)
-	r.GET("/api/admin/settings/gdrive/callback", handler.AdminGDriveCallback(db))
 
 	// HMAC-signed local file serving (public, signature-verified)
 	r.GET("/api/files/serve/*path", handler.ServeFile())
