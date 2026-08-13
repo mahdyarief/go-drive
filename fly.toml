@@ -1,0 +1,57 @@
+# ============================================================
+# go-drive — Fly.io deployment config
+# ============================================================
+# Deploy steps:
+#   1. fly launch --dockerfile Dockerfile --no-deploy   (first time only)
+#   2. fly volumes create go_drive_data --region sin --size 1
+#   3. fly secrets set AUTHULA_SECRET="$(openssl rand -hex 32)"
+#   4. Change AUTHULA_BASE_URL below to https://<your-app>.fly.dev
+#   5. fly deploy
+#
+# SQLite + Fly volume: all data (main DB, per-tenant DBs, local stores)
+# lives under /app/data, persisted on a 1 GB volume mounted at /app/data.
+# Single instance only — SQLite does not support multiple app instances.
+
+app = "go-drive"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8081"
+  DB_DRIVER = "sqlite"
+  SQLITE_PATH = "/app/data/app.db"
+  CSP_ENABLED = "1"
+  # Change this to your real Fly app URL after `fly launch`
+  AUTHULA_BASE_URL = "https://go-drive.fly.dev"
+
+[http_service]
+  internal_port = 8081
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[http_service.ports]]
+  port = 80
+  handlers = ["http"]
+
+[[http_service.ports]]
+  port = 443
+  handlers = ["tls", "http"]
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/api/health"
+
+[vm]
+  size = "shared-cpu-1x"
+  memory = 512
+
+[mounts]
+  source = "go_drive_data"
+  destination = "/app/data"

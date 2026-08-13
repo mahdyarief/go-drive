@@ -48,6 +48,10 @@ COPY --from=server /app/server-bin /app/server
 # godotenv.Load() reads /app/.env if present (mounted by docker-compose)
 ENV PORT=8081
 
+# Fly.io volume mount point — must be writable by the runtime user (nobody)
+# so SQLite can create its DB/tenant files and local store blobs.
+RUN mkdir -p /app/data && chown -R nobody:nobody /app/data
+
 EXPOSE 8081
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
