@@ -67,6 +67,15 @@ func RunPublicMigrations(ctx context.Context, db *bun.DB) error {
 		return fmt.Errorf("creating org_quotas table: %w", err)
 	}
 
+	// Older builds created the quota tables with a column named "limit" (a
+	// SQLite reserved keyword that breaks unquoted SUM(limit) queries). The
+	// IfNotExists create above skips existing tables, so repair them in place.
+	for _, table := range []string{"user_quotas", "org_quotas"} {
+		if err := renameQuotaLimitColumn(ctx, db, table); err != nil {
+			return fmt.Errorf("migrating %s quota column: %w", table, err)
+		}
+	}
+
 	// Global app settings (key-value) — UI-managed config (e.g. register-disabled).
 	// Unqualified name: resolves to the `public` schema on Postgres, the main
 	// database on SQLite.

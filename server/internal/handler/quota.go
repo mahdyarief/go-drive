@@ -50,6 +50,25 @@ func orgQuotaLimit(ctx context.Context, db *bun.DB, orgID string) (int64, error)
 	return q.QuotaLimit, nil
 }
 
+// orgOwnerUserLimit returns the admin-assigned storage limit of the user who
+// owns the org (0 = unlimited / no row). This caps the org's effective storage
+// even when no explicit org allocation has been set.
+func orgOwnerUserLimit(ctx context.Context, db *bun.DB, orgSlug string) (int64, error) {
+	var limit int64
+	err := db.NewRaw(`
+		SELECT COALESCE(uq.quota_limit, 0)
+		FROM organization_members om
+		JOIN organizations o ON o.id = om.organization_id
+		LEFT JOIN user_quotas uq ON uq.user_id = om.user_id
+		WHERE o.slug = ? AND om.role = 'owner'
+		LIMIT 1
+	`, orgSlug).Scan(ctx, &limit)
+	if err != nil {
+		return 0, err
+	}
+	return limit, nil
+}
+
 // SetOrgQuota sets the storage allocation an owner assigns to one of their
 // orgs. Validates the total of the user's org quotas stays within their
 // admin-assigned limit (0 = unlimited).
@@ -236,7 +255,12 @@ func checkOrgUploadQuota(ctx context.Context, db *bun.DB, tx bun.Tx, orgSlug str
 		JOIN organizations o ON o.id = oq.organization_id
 		WHERE o.slug = ?
 	`, orgSlug).Scan(ctx, &limit); err != nil {
-		return nil // no allocation row → unlimited
+		limit = 0 // no allocation row → fall back to the owner's user limit
+	}
+	// The owner's admin-assigned limit caps the org's storage even when no
+	// explicit org allocation row exists.
+	if ownerLimit, err := orgOwnerUserLimit(ctx, db, orgSlug); err == nil && ownerLimit > 0 && (limit == 0 || ownerLimit < limit) {
+		limit = ownerLimit
 	}
 	if limit <= 0 {
 		return nil // unlimited

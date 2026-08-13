@@ -59,6 +59,52 @@ func sqliteEnsureColumn(ctx context.Context, db bun.IDB, table, column, ddl stri
 	return err
 }
 
+// renameQuotaLimitColumn renames the legacy "limit" column to quota_limit on
+// tables created before the rename. "limit" is a reserved keyword in SQLite
+// and breaks unquoted SUM(limit) queries, so older builds shipped the quota
+// tables with a column that made them unusable; this repairs them in place.
+func renameQuotaLimitColumn(ctx context.Context, db bun.IDB, table string) error {
+	hasLegacy := false
+	if isSQLite(db) {
+		rows, err := db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var cid int
+			var name, typ string
+			var notNull int
+			var dflt any
+			var pk int
+			if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+				return err
+			}
+			if name == "limit" {
+				hasLegacy = true
+				break
+			}
+		}
+		// Close before the ALTER below: on non-WAL SQLite an open read
+		// statement holds a lock that would make the rename fail with
+		// SQLITE_BUSY.
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+	} else {
+		if err := db.NewRaw("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = ? AND table_schema = 'public' AND column_name = 'limit')", table).
+			Scan(ctx, &hasLegacy); err != nil {
+			return err
+		}
+	}
+	if !hasLegacy {
+		return nil
+	}
+	_, err := db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s RENAME COLUMN \"limit\" TO quota_limit", table))
+	return err
+}
+
 // CreateTenantSchema creates the tenant schema for the given org slug.
 // Postgres: creates a `tenant_<slug>` schema. SQLite has no schemas, so
 // tenant tables (if any) are created in the shared database file instead.

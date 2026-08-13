@@ -113,6 +113,11 @@ func StorageUsage(db *bun.DB) gin.HandlerFunc {
 		if allocated > 0 && (limit == 0 || allocated < limit) {
 			limit = allocated
 		}
+		// The owner's admin-assigned user limit is the hard ceiling even when
+		// no explicit org allocation has been set yet.
+		if userLimit, err := orgOwnerUserLimit(ctx, db, c.GetString("org_slug")); err == nil && userLimit > 0 && (limit == 0 || userLimit < limit) {
+			limit = userLimit
+		}
 		percentage := 0.0
 		if limit > 0 {
 			percentage = float64(used) / float64(limit) * 100
