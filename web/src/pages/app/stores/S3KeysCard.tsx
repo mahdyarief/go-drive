@@ -86,6 +86,7 @@ export function S3KeysCard({ orgSlug, s3Endpoint, isDev }: S3KeysCardProps) {
       }),
     onSuccess: (data) => {
       setKeyCreatedData(data)
+      setCreateKeyOpen(false)
       setKeyName('')
       setKeyPermissions('readwrite')
       queryClient.invalidateQueries({ queryKey: ['t', 's3keys', orgSlug] })
