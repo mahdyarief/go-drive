@@ -92,10 +92,6 @@ export function StoreCard({
                 </Badge>
               )}
             </div>
-            <p className="truncate text-xs text-muted-foreground">
-              {providerLabel(t, store.provider)}
-              {store.write_mode !== 'none' && ` · ${store.write_mode}`}
-            </p>
           </div>
         </div>
         <DropdownMenu>
@@ -141,34 +137,42 @@ export function StoreCard({
         </DropdownMenu>
       </div>
       {quotaRows.length > 0 && (
-        <div className="mt-2 space-y-1">
+        <div className="mt-3 space-y-2">
           {quotaRows.map((row) => {
             const percent = Math.min(100, (store.quota_used / row.limit) * 100)
             const over = store.quota_used > row.limit
             return (
-              <div key={row.label} className="flex items-center gap-2">
-                <span className="w-24 shrink-0 truncate text-xs text-muted-foreground">{row.label}</span>
-                <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+              <div key={row.label} className="space-y-1.5">
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className={`h-full rounded-full ${over ? 'bg-destructive' : 'bg-primary'}`}
+                    className={`h-full ${over ? 'bg-destructive' : 'bg-primary'}`}
                     style={{ width: `${percent}%` }}
                   />
                 </div>
-                <span className={`shrink-0 text-xs tabular-nums ${over ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  {formatBytes(store.quota_used)} / {formatBytes(row.limit)}
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{row.label}</span>
+                  <span className={`text-xs font-medium tabular-nums ${over ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {formatBytes(store.quota_used)} / {formatBytes(row.limit)}
+                  </span>
+                </div>
               </div>
             )
           })}
         </div>
       )}
-      {store.provider === 'gdrive' && store.provider_quota_limit > 0 && (
-        <p className="mt-1 text-[11px] text-muted-foreground/70">
-          {store.provider_quota_measured_at
-            ? t('stores.quotaMeasuredAt', { time: new Date(store.provider_quota_measured_at).toLocaleString() })
-            : t('stores.quotaNotMeasured')}
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+        <p className="min-w-0 truncate">
+          {providerLabel(t, store.provider)}
+          {store.write_mode !== 'none' && ` · ${store.write_mode}`}
         </p>
-      )}
+        {store.provider === 'gdrive' && (
+          <p className="shrink-0 text-muted-foreground/70">
+            {store.provider_quota_measured_at
+              ? t('stores.quotaMeasuredAt', { time: new Date(store.provider_quota_measured_at).toLocaleString() })
+              : t('stores.quotaNotMeasured')}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

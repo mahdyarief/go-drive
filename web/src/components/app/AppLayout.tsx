@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/auth'
 import { OrgSwitcher } from '@/components/OrgSwitcher'
 import { NavLink } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { PanelLeftClose, PanelLeft, LogOut, Home, LayoutDashboard, X, Menu, Folder, Database, Link2, Users, Palette, Bell, BookOpen, History } from 'lucide-react'
+import { PanelLeftClose, PanelLeft, LogOut, Home, X, Menu, Folder, Database, Link2, Users, Palette, Bell, BookOpen, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSidebarCollapsed } from '@/lib/useSidebarCollapsed'
 import { AppHeader } from '@/components/app/AppHeader'
@@ -70,10 +70,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <NavLink to="/" end className={linkClass}>
             <Home className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Home</span>
-          </NavLink>
-          <NavLink to="/app/status" end className={linkClass}>
-            <LayoutDashboard className="h-4 w-4 shrink-0" />
-            <span className={cn(isCollapsed && 'md:hidden')}>Dashboard</span>
           </NavLink>
           <NavLink to="/app/files" end className={linkClass}>
             <Folder className="h-4 w-4 shrink-0" />

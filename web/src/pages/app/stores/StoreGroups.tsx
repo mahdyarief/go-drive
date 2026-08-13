@@ -85,7 +85,7 @@ export function StoreGroups({
               </Badge>
             </Button>
             {!isCollapsed && (
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-1 gap-3">
                 {items.map((store) => (
                   <StoreCard
                     key={store.id}
