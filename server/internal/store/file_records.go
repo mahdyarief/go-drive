@@ -202,7 +202,7 @@ func ResolveUploadStoreReserved(ctx context.Context, tx bun.IDB, size int64, res
 		// already exists — reads never create one).
 		if hasPolicy {
 			_, _ = tx.NewUpdate().Model((*model.StoreRoutingPolicy)(nil)).
-				Set("round_robin_cursor = ?", cursor+1, "updated_at = ?", time.Now()).
+				Set("round_robin_cursor = ?, updated_at = ?", cursor+1, time.Now()).
 				Where("workspace_id = ?", uuid.Nil).
 				Exec(ctx)
 		}
@@ -263,8 +263,8 @@ func refreshStaleQuotas(ctx context.Context, tx bun.IDB, stores []model.Store) {
 		now := time.Now()
 		if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
 			Where("id = ?", s.ID).
-			Set("quota_used = ?", used, "provider_quota_limit = ?", limit).
-			Set("provider_quota_measured_at = ?", now, "last_synced_at = ?", now, "updated_at = ?", now).
+			Set("quota_used = ?, provider_quota_limit = ?", used, limit).
+			Set("provider_quota_measured_at = ?, last_synced_at = ?, updated_at = ?", now, now, now).
 			Exec(ctx); err != nil {
 			continue
 		}
@@ -349,13 +349,13 @@ func MarkFileUploadReady(ctx context.Context, tx bun.IDB, fileID, blobID, storeI
 	now := time.Now()
 
 	if _, err := tx.NewUpdate().Model((*model.File)(nil)).
-		Set("status = 'ready'", "storage_path = ?", storagePath, "updated_at = ?", now).
+		Set("status = 'ready', storage_path = ?, updated_at = ?", storagePath, now).
 		Where("id = ?", fileID).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("store: marking file ready: %w", err)
 	}
 	if _, err := tx.NewUpdate().Model((*model.FileBlob)(nil)).
-		Set("state = 'ready'", "updated_at = ?", now).
+		Set("state = 'ready', updated_at = ?", now).
 		Where("id = ?", blobID).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("store: marking blob ready: %w", err)

@@ -155,7 +155,7 @@ func UpdateShareLink(db *bun.DB) gin.HandlerFunc {
 				Err(c, http.StatusInternalServerError, "hashing password: "+err.Error())
 				return
 			}
-			u.Set("has_password = ?", *req.Password != "", "password_hash = ?", hash)
+			u.Set("has_password = ?, password_hash = ?", *req.Password != "", hash)
 		}
 		if req.ExpiresAt != nil {
 			u.Set("expires_at = ?", *req.ExpiresAt)
@@ -453,7 +453,7 @@ func resolveSharedFile(c *gin.Context, tx bun.Tx, fileID, folderID *uuid.UUID, f
 // bumpShareCount increments a share link's download_count and last_accessed_at.
 func bumpShareCount(ctx context.Context, tx bun.Tx, linkID uuid.UUID) error {
 	_, err := tx.NewUpdate().Model((*model.ShareLink)(nil)).
-		Set("download_count = download_count + 1", "last_accessed_at = ?", time.Now()).
+		Set("download_count = download_count + 1, last_accessed_at = ?", time.Now()).
 		Where("id = ?", linkID).
 		Exec(ctx)
 	return err

@@ -155,7 +155,7 @@ func UpdateUploadLink(db *bun.DB) gin.HandlerFunc {
 				Err(c, http.StatusInternalServerError, "hashing password: "+err.Error())
 				return
 			}
-			u.Set("has_password = ?", *req.Password != "", "password_hash = ?", hash)
+			u.Set("has_password = ?, password_hash = ?", *req.Password != "", hash)
 		}
 		if req.ExpiresAt != nil {
 			u.Set("expires_at = ?", *req.ExpiresAt)
@@ -331,7 +331,7 @@ func PublicUpload(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 		if _, err := tx.NewUpdate().Model((*model.UploadLink)(nil)).
-			Set("files_uploaded = files_uploaded + 1", "updated_at = ?", time.Now()).
+			Set("files_uploaded = files_uploaded + 1, updated_at = ?", time.Now()).
 			Where("id = ?", link.ID).
 			Exec(ctx); err != nil {
 			Err(c, http.StatusInternalServerError, "updating upload count: "+err.Error())

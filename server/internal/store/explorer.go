@@ -47,7 +47,7 @@ func DeleteFolderRecursive(ctx context.Context, tx bun.IDB, folderID uuid.UUID) 
 		return 0, err
 	}
 	if _, err := tx.NewUpdate().Model((*model.File)(nil)).
-		Set("folder_id = NULL", "updated_at = ?", time.Now()).
+		Set("folder_id = NULL, updated_at = ?", time.Now()).
 		Where("folder_id IN (?)", bun.In(ids)).
 		Exec(ctx); err != nil {
 		return 0, fmt.Errorf("store: moving files to root: %w", err)
@@ -93,13 +93,13 @@ func RenameFile(ctx context.Context, tx bun.IDB, fileID uuid.UUID, name string, 
 
 	if objectKey != "" {
 		if _, err := tx.NewUpdate().Model((*model.FileBlob)(nil)).
-			Set("object_key = ?", objectKey, "updated_at = ?", time.Now()).
+			Set("object_key = ?, updated_at = ?", objectKey, time.Now()).
 			Where("id = ?", f.BlobID).
 			Exec(ctx); err != nil {
 			return nil, fmt.Errorf("store: updating blob object_key: %w", err)
 		}
 		if _, err := tx.NewUpdate().Model((*model.BlobLocation)(nil)).
-			Set("storage_path = ?", objectKey, "updated_at = ?", time.Now()).
+			Set("storage_path = ?, updated_at = ?", objectKey, time.Now()).
 			Where("blob_id = ?", f.BlobID).
 			Exec(ctx); err != nil {
 			return nil, fmt.Errorf("store: updating blob_location storage_path: %w", err)

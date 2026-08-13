@@ -92,7 +92,7 @@ func UpdateTag(db *bun.DB) gin.HandlerFunc {
 		}
 		u := tx.NewUpdate().Model((*model.Tag)(nil))
 		if n := trimSpace(req.Name); n != "" && n != t.Name {
-			u.Set("name = ?", n, "slug = ?", slugify(n))
+			u.Set("name = ?, slug = ?", n, slugify(n))
 		}
 		if req.Color != "" && req.Color != t.Color {
 			u.Set("color = ?", req.Color)

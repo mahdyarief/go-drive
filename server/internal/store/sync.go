@@ -151,7 +151,7 @@ func SyncWorkspace(ctx context.Context, tx bun.IDB, sourceStoreID *uuid.UUID, tr
 		}
 		run.ProcessedItems++
 		if _, err := tx.NewUpdate().Model((*model.ReplicationRun)(nil)).
-			Set("processed_items = ?", run.ProcessedItems, "updated_at = ?", time.Now()).
+			Set("processed_items = ?, updated_at = ?", run.ProcessedItems, time.Now()).
 			Where("id = ?", run.ID).
 			Exec(ctx); err != nil {
 			return nil, fmt.Errorf("store: updating run progress: %w", err)

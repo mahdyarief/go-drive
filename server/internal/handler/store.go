@@ -62,8 +62,8 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 			now := time.Now()
 			if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
 				Where("id = ?", s.ID).
-				Set("quota_used = ?", used, "provider_quota_limit = ?", limit).
-				Set("provider_quota_measured_at = ?", now, "last_tested_at = ?", now, "updated_at = ?", now).
+				Set("quota_used = ?, provider_quota_limit = ?", used, limit).
+				Set("provider_quota_measured_at = ?, last_tested_at = ?, updated_at = ?", now, now, now).
 				Exec(ctx); err == nil {
 				s.QuotaUsed = used
 				s.ProviderQuotaLimit = limit
@@ -341,8 +341,8 @@ func TestStore(db *bun.DB) gin.HandlerFunc {
 		}
 		now := time.Now()
 		if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
-			Set("last_tested_at = ?", now, "updated_at = ?", now).
-			Set("quota_used = ?", used, "provider_quota_limit = ?", limit).
+			Set("last_tested_at = ?, updated_at = ?", now, now).
+			Set("quota_used = ?, provider_quota_limit = ?", used, limit).
 			Set("provider_quota_measured_at = ?", now).
 			Where("id = ?", id).
 			Exec(ctx); err != nil {
@@ -417,7 +417,7 @@ func SetStorageMode(db *bun.DB) gin.HandlerFunc {
 		}
 
 		if _, err := tx.NewUpdate().Model((*model.WorkspaceStorageSetting)(nil)).
-			Set("storage_mode = ?", mode, "updated_at = ?", time.Now()).
+			Set("storage_mode = ?, updated_at = ?", mode, time.Now()).
 			Where("workspace_id = ?", setting.WorkspaceID).
 			Exec(ctx); err != nil {
 			Err(c, http.StatusInternalServerError, err.Error())

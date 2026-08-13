@@ -184,7 +184,7 @@ func UpdateTrackedLink(db *bun.DB) gin.HandlerFunc {
 				Err(c, http.StatusInternalServerError, "hashing password: "+err.Error())
 				return
 			}
-			u.Set("has_password = ?", *req.Password != "", "password_hash = ?", hash)
+			u.Set("has_password = ?, password_hash = ?", *req.Password != "", hash)
 		}
 		if req.RequireEmail != nil {
 			u.Set("require_email = ?", *req.RequireEmail)
@@ -287,7 +287,7 @@ func PublicTrackedLink(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 		if _, err := tx.NewUpdate().Model((*model.TrackedLink)(nil)).
-			Set("view_count = view_count + 1", "last_accessed_at = ?", time.Now()).
+			Set("view_count = view_count + 1, last_accessed_at = ?", time.Now()).
 			Where("id = ?", link.ID).
 			Exec(ctx); err != nil {
 			Err(c, http.StatusInternalServerError, "updating view count: "+err.Error())
@@ -361,7 +361,7 @@ func PublicTrackedDownload(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 		if _, err := tx.NewUpdate().Model((*model.TrackedLink)(nil)).
-			Set("download_count = download_count + 1", "last_accessed_at = ?", time.Now()).
+			Set("download_count = download_count + 1, last_accessed_at = ?", time.Now()).
 			Where("id = ?", link.ID).
 			Exec(ctx); err != nil {
 			Err(c, http.StatusInternalServerError, "updating download count: "+err.Error())
@@ -410,7 +410,7 @@ func PublicTrackedRaw(db *bun.DB) gin.HandlerFunc {
 		c.DataFromReader(http.StatusOK, size, mime, r, nil)
 		_ = recordTrackedDownload(ctx, tx, link.ID, c)
 		_, _ = tx.NewUpdate().Model((*model.TrackedLink)(nil)).
-			Set("download_count = download_count + 1", "last_accessed_at = ?", time.Now()).
+			Set("download_count = download_count + 1, last_accessed_at = ?", time.Now()).
 			Where("id = ?", link.ID).
 			Exec(ctx)
 	}
