@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 
+	"go-drive/server/internal/config"
 	"go-drive/server/internal/crypto"
 	"go-drive/server/internal/model"
 	"go-drive/server/internal/s3"
@@ -30,28 +32,51 @@ import (
 
 // S3Gateway is the top-level handler for the S3-compatible gateway at
 // /api/s3/*path. Path layout: /api/s3/{workspaceSlug}/{key...}. The first path
-// segment is the workspace slug; the remainder is the object key (display
-// path). Requests are authenticated with AWS SigV4 against a tenant-scoped
-// s3_api_keys row.
+// segment is the workspace slug and — since the gateway is single-tenant per
+// key — the only valid bucket name. X-Org-Slug is NOT required for object
+// operations (enforcing it would break existing SigV4 clients); it is honored
+// only by ListBuckets on the empty path to resolve the caller's tenant.
+// Requests are authenticated with AWS SigV4 against a tenant-scoped
+// s3_api_keys row, either via the Authorization header or a presigned query
+// string (GET only).
 func S3Gateway(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 		p := strings.Trim(c.Param("path"), "/")
-		parts := strings.SplitN(p, "/", 2)
-		if parts[0] == "" {
-			s3Err(c, http.StatusBadRequest, "InvalidRequest", "workspace slug is required")
+
+		// GET /api/s3 with no slug is ListBuckets (aws s3 ls).
+		if p == "" {
+			s3ListBuckets(c, db)
 			return
 		}
+
+		parts := strings.SplitN(p, "/", 2)
 		workspaceSlug := parts[0]
 		key := ""
 		if len(parts) > 1 {
 			key = parts[1]
 		}
 
-		// Look up the API key by access key id from the Authorization header.
-		accessKeyID, err := s3.AccessKeyID(c.Request)
+		// Presigned URLs carry no Authorization header; they authenticate via
+		// X-Amz-Credential/X-Amz-Signature query params instead.
+		presigned := c.Request.Header.Get("Authorization") == ""
+		var accessKeyID string
+		var err error
+		if presigned {
+			accessKeyID, err = s3.PresignedAccessKeyID(c.Request)
+		} else {
+			accessKeyID, err = s3.AccessKeyID(c.Request)
+		}
 		if err != nil {
-			s3Err(c, http.StatusForbidden, "AccessDenied", err.Error())
+			s3Err(c, http.StatusForbidden, "InvalidAccessKeyId", "invalid access key id")
+			return
+		}
+
+		// Strict bucket validation: the slug must be a real tenant. Checking
+		// before OpenTx also prevents SQLite mode from auto-creating a phantom
+		// tenant file for a mistyped bucket.
+		if !bucketExists(ctx, db, workspaceSlug) {
+			s3Err(c, http.StatusNotFound, "NoSuchBucket", "the specified bucket does not exist")
 			return
 		}
 
@@ -69,7 +94,7 @@ func S3Gateway(db *bun.DB) gin.HandlerFunc {
 
 		var apiKey model.S3APIKey
 		if err := tx.NewSelect().Model(&apiKey).Where("access_key_id = ?", accessKeyID).Scan(ctx); err != nil {
-			s3Err(c, http.StatusForbidden, "AccessDenied", "invalid access key")
+			s3Err(c, http.StatusForbidden, "InvalidAccessKeyId", "invalid access key id")
 			return
 		}
 		if !apiKey.IsActive {
@@ -83,10 +108,19 @@ func S3Gateway(db *bun.DB) gin.HandlerFunc {
 
 		secret, err := crypto.Decrypt(apiKey.EncryptedSecret)
 		if err != nil {
-			s3Err(c, http.StatusForbidden, "AccessDenied", "invalid access key")
+			s3Err(c, http.StatusForbidden, "InvalidAccessKeyId", "invalid access key id")
 			return
 		}
-		if err := s3.VerifySigV4(c.Request, secret); err != nil {
+		if presigned {
+			if c.Request.Method != http.MethodGet {
+				s3Err(c, http.StatusForbidden, "AccessDenied", "presigned URLs are only supported for GET")
+				return
+			}
+			err = s3.VerifyPresignedQuery(c.Request, secret)
+		} else {
+			err = s3.VerifySigV4(c.Request, secret)
+		}
+		if err != nil {
 			s3Err(c, http.StatusForbidden, "SignatureDoesNotMatch", err.Error())
 			return
 		}
@@ -100,9 +134,14 @@ func S3Gateway(db *bun.DB) gin.HandlerFunc {
 
 		method := c.Request.Method
 		q := c.Request.URL.Query()
+		// AWS SDKs send ?uploads with an empty value; q.Get would return ""
+		// and the multipart branches would never match.
+		_, hasUploads := q["uploads"]
 
 		switch {
-		case method == http.MethodGet && q.Get("uploads") != "":
+		case method == http.MethodHead && key == "":
+			c.Status(http.StatusOK) // bucket validated above
+		case method == http.MethodGet && hasUploads:
 			s3ListMultipartUploads(c, tx, key, apiKey.UserID)
 		case method == http.MethodGet && q.Get("uploadId") != "" && q.Get("partNumber") == "":
 			s3ListParts(c, tx, key, q.Get("uploadId"))
@@ -116,7 +155,7 @@ func S3Gateway(db *bun.DB) gin.HandlerFunc {
 			s3UploadPart(c, tx, key, q.Get("uploadId"), q.Get("partNumber"))
 		case method == http.MethodPut:
 			s3PutObject(c, tx, key, apiKey.UserID)
-		case method == http.MethodPost && q.Get("uploads") != "":
+		case method == http.MethodPost && hasUploads:
 			s3CreateMultipartUpload(c, tx, key, apiKey.UserID)
 		case method == http.MethodPost && q.Get("uploadId") != "":
 			s3CompleteMultipartUpload(c, tx, key, q.Get("uploadId"))
@@ -204,7 +243,7 @@ func s3GetObject(c *gin.Context, tx bun.IDB, key string) {
 		s3Err(c, http.StatusNotFound, "NoSuchKey", "object not found")
 		return
 	}
-	s, path, err := store.ResolveReadStore(ctx, tx, f.BlobID, f.StoragePath)
+	s, _, err := store.ResolveReadStore(ctx, tx, f.BlobID, f.StoragePath)
 	if err != nil {
 		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
 		return
@@ -214,20 +253,22 @@ func s3GetObject(c *gin.Context, tx bun.IDB, key string) {
 		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
 		return
 	}
-	body, size, err := st.Download(ctx, path)
+	// Download the file's own storage path (the object key), not the
+	// blob_locations path which can diverge from the upload key and 404.
+	body, size, err := st.Download(ctx, f.StoragePath)
 	if err != nil {
 		s3Err(c, http.StatusNotFound, "NoSuchKey", "object not found")
 		return
 	}
 	defer body.Close()
 
-	c.Header("Content-Type", f.MimeType)
+	c.Header("Content-Type", mimeTypeFor(f))
 	c.Header("ETag", etagFor(f))
 	c.Header("Last-Modified", f.UpdatedAt.UTC().Format(http.TimeFormat))
 	if size >= 0 {
 		c.Header("Content-Length", strconv.FormatInt(size, 10))
 	}
-	c.DataFromReader(http.StatusOK, size, f.MimeType, body, nil)
+	c.DataFromReader(http.StatusOK, size, mimeTypeFor(f), body, nil)
 }
 
 func s3HeadObject(c *gin.Context, tx bun.IDB, key string) {
@@ -237,7 +278,7 @@ func s3HeadObject(c *gin.Context, tx bun.IDB, key string) {
 		s3Err(c, http.StatusNotFound, "NoSuchKey", "object not found")
 		return
 	}
-	c.Header("Content-Type", f.MimeType)
+	c.Header("Content-Type", mimeTypeFor(f))
 	c.Header("ETag", etagFor(f))
 	c.Header("Last-Modified", f.UpdatedAt.UTC().Format(http.TimeFormat))
 	c.Header("Content-Length", strconv.FormatInt(f.Size, 10))
@@ -269,6 +310,14 @@ func s3PutObject(c *gin.Context, tx bun.IDB, key, userID string) {
 	size := c.Request.ContentLength
 	if size <= 0 {
 		size = 0
+	}
+	// S3 PUT overwrites: drop any existing row at this key so the UNIQUE
+	// object_key constraint doesn't reject the re-upload.
+	if existing, err := findFileByKey(ctx, tx, key); err == nil {
+		if err := store.DeleteFileEverywhere(ctx, tx, existing.ID); err != nil {
+			s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
+			return
+		}
 	}
 	blob, f, err := store.CreatePendingFileUpload(ctx, tx, userID, folderID, name, key, contentType, size)
 	if err != nil {
@@ -423,16 +472,203 @@ func s3ListObjectsV2(c *gin.Context, tx bun.IDB, key string) {
 	c.XML(http.StatusOK, result)
 }
 
-// s3Err writes an S3-compatible XML error response and records on the context
-// that the request failed, so S3Gateway rolls back the transaction instead of
-// committing partially-written records (e.g. orphaned pending file rows).
+// s3Err writes an S3-compatible XML error response (with a per-request
+// RequestId and a static HostId for AWS SDK compatibility) and records on the
+// context that the request failed, so S3Gateway rolls back the transaction
+// instead of committing partially-written records (e.g. orphaned pending file
+// rows).
 func s3Err(c *gin.Context, status int, code, message string) {
 	c.Set("s3_errored", true)
+	requestID := tokenHex(8)
+	c.Header("x-amz-request-id", requestID)
 	c.Header("Content-Type", "application/xml")
 	c.Status(status)
-	_ = xml.NewEncoder(c.Writer).Encode(struct {
-		XMLName xml.Name `xml:"Error"`
-		Code    string   `xml:"Code"`
-		Message string   `xml:"Message"`
-	}{Code: code, Message: message})
+	_ = xml.NewEncoder(c.Writer).Encode(s3ErrorResponse{
+		XMLName:   xml.Name{Local: "Error"},
+		Code:      code,
+		Message:   message,
+		RequestID: requestID,
+		HostID:    s3HostID,
+	})
+}
+
+type s3ErrorResponse struct {
+	XMLName   xml.Name `xml:"Error"`
+	Code      string   `xml:"Code"`
+	Message   string   `xml:"Message"`
+	RequestID string   `xml:"RequestId"`
+	HostID    string   `xml:"HostId"`
+}
+
+const s3HostID = "go-drive"
+
+// mimeTypeFor returns the file's stored MIME type, defaulting to
+// application/octet-stream when the row has none.
+func mimeTypeFor(f *model.File) string {
+	if f.MimeType != "" {
+		return f.MimeType
+	}
+	return "application/octet-stream"
+}
+
+// ------------------------------------------------------------- bucket admin
+
+type listAllMyBucketsResult struct {
+	XMLName xml.Name   `xml:"ListAllMyBucketsResult"`
+	Xmlns   string     `xml:"xmlns,attr"`
+	Owner   s3Owner    `xml:"Owner"`
+	Buckets []s3Bucket `xml:"Buckets>Bucket"`
+}
+
+type s3Owner struct {
+	ID          string `xml:"ID"`
+	DisplayName string `xml:"DisplayName"`
+}
+
+type s3Bucket struct {
+	Name         string `xml:"Name"`
+	CreationDate string `xml:"CreationDate"`
+}
+
+// bucketExists reports whether the tenant schema/DB for slug exists. In SQLite
+// mode a file check is used because tenant.DB auto-creates a fresh file for
+// any slug; in Postgres mode the public organizations table is authoritative.
+func bucketExists(ctx context.Context, db *bun.DB, slug string) bool {
+	if config.IsSQLite() {
+		_, err := os.Stat(config.SQLiteTenantPath(slug))
+		return err == nil
+	}
+	exists, err := db.NewSelect().Model((*model.Organization)(nil)).Where("slug = ?", slug).Exists(ctx)
+	return err == nil && exists
+}
+
+// findTenantForKey scans the known tenants for the one that owns accessKeyID.
+// Used by ListBuckets when no X-Org-Slug header is present.
+func findTenantForKey(ctx context.Context, db *bun.DB, accessKeyID string) string {
+	if config.IsSQLite() {
+		entries, err := os.ReadDir(config.SQLiteTenantDir())
+		if err != nil {
+			return ""
+		}
+		for _, e := range entries {
+			name := e.Name()
+			if !strings.HasPrefix(name, "tenant_") || !strings.HasSuffix(name, ".db") {
+				continue
+			}
+			slug := strings.TrimSuffix(strings.TrimPrefix(name, "tenant_"), ".db")
+			if tenantHasKey(ctx, db, slug, accessKeyID) {
+				return slug
+			}
+		}
+		return ""
+	}
+	var orgs []model.Organization
+	if err := db.NewSelect().Model(&orgs).Scan(ctx); err != nil {
+		return ""
+	}
+	for _, o := range orgs {
+		if tenantHasKey(ctx, db, o.Slug, accessKeyID) {
+			return o.Slug
+		}
+	}
+	return ""
+}
+
+// tenantHasKey reports whether a tenant has an s3_api_keys row for the id.
+func tenantHasKey(ctx context.Context, db *bun.DB, slug, accessKeyID string) bool {
+	tx, err := tenant.OpenTx(ctx, db, slug)
+	if err != nil {
+		return false
+	}
+	defer tx.Rollback()
+	var k model.S3APIKey
+	return tx.NewSelect().Model(&k).Where("access_key_id = ?", accessKeyID).Scan(ctx) == nil
+}
+
+// s3ListBuckets implements ListBuckets (aws s3 ls). The gateway is
+// single-tenant per key, so the response contains exactly one bucket named
+// after the caller's workspace slug. The tenant is resolved from the
+// X-Org-Slug header when present, otherwise by scanning for the tenant that
+// owns the access key.
+func s3ListBuckets(c *gin.Context, db *bun.DB) {
+	ctx := c.Request.Context()
+	presigned := c.Request.Header.Get("Authorization") == ""
+	var accessKeyID string
+	var err error
+	if presigned {
+		accessKeyID, err = s3.PresignedAccessKeyID(c.Request)
+	} else {
+		accessKeyID, err = s3.AccessKeyID(c.Request)
+	}
+	if err != nil {
+		s3Err(c, http.StatusForbidden, "InvalidAccessKeyId", "invalid access key id")
+		return
+	}
+
+	slug := c.GetHeader("X-Org-Slug")
+	if slug != "" {
+		if !bucketExists(ctx, db, slug) {
+			s3Err(c, http.StatusNotFound, "NoSuchBucket", "the specified bucket does not exist")
+			return
+		}
+	} else {
+		slug = findTenantForKey(ctx, db, accessKeyID)
+		if slug == "" {
+			s3Err(c, http.StatusForbidden, "InvalidAccessKeyId", "invalid access key id")
+			return
+		}
+	}
+
+	tx, err := tenant.OpenTx(ctx, db, slug)
+	if err != nil {
+		s3Err(c, http.StatusNotFound, "NoSuchBucket", "workspace not found")
+		return
+	}
+	ok := false
+	defer func() {
+		if !ok {
+			_ = tx.Rollback()
+		}
+	}()
+
+	var apiKey model.S3APIKey
+	if err := tx.NewSelect().Model(&apiKey).Where("access_key_id = ?", accessKeyID).Scan(ctx); err != nil {
+		s3Err(c, http.StatusForbidden, "InvalidAccessKeyId", "invalid access key id")
+		return
+	}
+	if !apiKey.IsActive {
+		s3Err(c, http.StatusForbidden, "AccessDenied", "access key is inactive")
+		return
+	}
+	if apiKey.ExpiresAt != nil && time.Now().After(*apiKey.ExpiresAt) {
+		s3Err(c, http.StatusForbidden, "AccessDenied", "access key has expired")
+		return
+	}
+
+	secret, err := crypto.Decrypt(apiKey.EncryptedSecret)
+	if err != nil {
+		s3Err(c, http.StatusForbidden, "InvalidAccessKeyId", "invalid access key id")
+		return
+	}
+	if presigned {
+		err = s3.VerifyPresignedQuery(c.Request, secret)
+	} else {
+		err = s3.VerifySigV4(c.Request, secret)
+	}
+	if err != nil {
+		s3Err(c, http.StatusForbidden, "SignatureDoesNotMatch", err.Error())
+		return
+	}
+
+	ok = true
+	_ = tx.Commit()
+
+	c.XML(http.StatusOK, listAllMyBucketsResult{
+		Xmlns: "http://s3.amazonaws.com/doc/2006-03-01/",
+		Owner: s3Owner{ID: apiKey.UserID, DisplayName: apiKey.UserID},
+		Buckets: []s3Bucket{{
+			Name:         slug,
+			CreationDate: apiKey.CreatedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
+		}},
+	})
 }

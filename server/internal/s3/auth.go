@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -132,6 +133,114 @@ func AccessKeyID(r *http.Request) (string, error) {
 		return cred[:idx], nil
 	}
 	return "", fmt.Errorf("missing credential")
+}
+
+// PresignedAccessKeyID extracts the access key id from the X-Amz-Credential
+// query parameter of a presigned URL (the first segment before the first '/').
+func PresignedAccessKeyID(r *http.Request) (string, error) {
+	cred := r.URL.Query().Get("X-Amz-Credential")
+	if cred == "" {
+		return "", fmt.Errorf("missing x-amz-credential")
+	}
+	idx := strings.Index(cred, "/")
+	if idx < 0 {
+		return "", fmt.Errorf("invalid credential scope")
+	}
+	return cred[:idx], nil
+}
+
+// VerifyPresignedQuery validates an AWS SigV4 presigned URL (query-string
+// authentication). The signature is recomputed over the request method, path,
+// and all query parameters except X-Amz-Signature, using the empty payload
+// hash, and compared in constant time. Expiry is bounded by X-Amz-Expires
+// (max 7 days) plus the usual ±15 minute clock-skew window.
+func VerifyPresignedQuery(r *http.Request, secretAccessKey string) error {
+	q := r.URL.Query()
+	signature := q.Get("X-Amz-Signature")
+	credential := q.Get("X-Amz-Credential")
+	amzDate := q.Get("X-Amz-Date")
+	expires := q.Get("X-Amz-Expires")
+	if signature == "" || credential == "" || amzDate == "" || expires == "" {
+		return fmt.Errorf("incomplete presigned query")
+	}
+
+	credParts := strings.Split(credential, "/")
+	if len(credParts) != 5 {
+		return fmt.Errorf("invalid credential scope")
+	}
+	dateStamp, region, service := credParts[1], credParts[2], credParts[3]
+	if credParts[4] != "aws4_request" {
+		return fmt.Errorf("invalid credential terminator")
+	}
+
+	t, err := time.Parse("20060102T150405Z", amzDate)
+	if err != nil {
+		return fmt.Errorf("invalid x-amz-date: %w", err)
+	}
+	exp, err := strconv.Atoi(expires)
+	if err != nil || exp < 0 || exp > 7*24*3600 {
+		return fmt.Errorf("invalid x-amz-expires")
+	}
+	if time.Since(t) > time.Duration(exp)*time.Second || time.Since(t) < -15*time.Minute {
+		return fmt.Errorf("request timestamp out of range")
+	}
+
+	// Rebuild the canonical query without the signature. Values are decoded by
+	// URL.Query() and re-encoded, so the canonical form matches what the client
+	// signed regardless of the original encoding.
+	canonicalVals := url.Values{}
+	for k, vs := range q {
+		if k == "X-Amz-Signature" {
+			continue
+		}
+		for _, v := range vs {
+			canonicalVals.Add(k, v)
+		}
+	}
+
+	canonicalURI := r.URL.EscapedPath()
+	if canonicalURI == "" {
+		canonicalURI = "/"
+	}
+
+	// AWS SDKs sign presigned URLs with X-Amz-SignedHeaders=host; the host
+	// header must appear in the canonical request or the signature won't match.
+	signedHeaders := q.Get("X-Amz-SignedHeaders")
+	canonicalHeaders := ""
+	if signedHeaders != "" {
+		for _, h := range strings.Split(signedHeaders, ";") {
+			h = strings.ToLower(strings.TrimSpace(h))
+			if h != "host" {
+				return fmt.Errorf("unsupported signed header: %s", h)
+			}
+			canonicalHeaders += "host:" + strings.ToLower(strings.TrimSpace(r.Host)) + "\n"
+		}
+	}
+
+	// AWS SDKs (botocore/aws-cli) sign presigned URLs with the literal
+	// "UNSIGNED-PAYLOAD" as the payload hash, not the SHA-256 of an empty body.
+	canonicalRequest := strings.Join([]string{
+		r.Method,
+		canonicalURI,
+		canonicalQueryString(canonicalVals.Encode()),
+		canonicalHeaders,
+		signedHeaders,
+		"UNSIGNED-PAYLOAD",
+	}, "\n")
+
+	scope := dateStamp + "/" + region + "/" + service + "/aws4_request"
+	stringToSign := "AWS4-HMAC-SHA256\n" + amzDate + "\n" + scope + "\n" + hexSha256(canonicalRequest)
+
+	kDate := hmacSHA256([]byte("AWS4"+secretAccessKey), dateStamp)
+	kRegion := hmacSHA256(kDate, region)
+	kService := hmacSHA256(kRegion, service)
+	kSigning := hmacSHA256(kService, "aws4_request")
+	expected := hex.EncodeToString(hmacSHA256(kSigning, stringToSign))
+
+	if !hmac.Equal([]byte(expected), []byte(signature)) {
+		return fmt.Errorf("signature mismatch")
+	}
+	return nil
 }
 
 // canonicalQueryString sorts and URI-encodes the raw query string per SigV4.

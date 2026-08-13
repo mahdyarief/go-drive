@@ -175,7 +175,10 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 	r.GET("/api/files/serve/*path", handler.ServeFile())
 
 	// S3-compatible gateway (M8) — SigV4-authenticated, no session required.
-	// Path: /api/s3/{workspaceSlug}/{key...}
+	// Path: /api/s3/{workspaceSlug}/{key...}. The bare /api/s3 route is
+	// registered explicitly so ListBuckets (aws s3 ls) is not intercepted by
+	// Gin's trailing-slash redirect before the handler's empty-path dispatch.
+	r.Any("/api/s3", handler.S3Gateway(db))
 	r.Any("/api/s3/*path", handler.S3Gateway(db))
 
 	// Serve embedded frontend in production
