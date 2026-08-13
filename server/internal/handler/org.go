@@ -136,24 +136,25 @@ func GetOrg(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Fetch all members of this org
-		var members []model.OrganizationMember
-		err = db.NewSelect().
-			Model(&members).
-			Where("organization_id = ?", member.OrganizationID).
-			Scan(c.Request.Context())
+		// Fetch all members of this org with display names/emails from users
+		type memberView struct {
+			ID     string `json:"id"`
+			UserID string `json:"user_id"`
+			Name   string `json:"name"`
+			Email  string `json:"email"`
+			Role   string `json:"role"`
+		}
+		var memberList []memberView
+		err = db.NewRaw(`
+			SELECT CAST(m.id AS TEXT) AS id, m.user_id, u.name, u.email, m.role
+			FROM organization_members m
+			LEFT JOIN users u ON CAST(u.id AS TEXT) = m.user_id
+			WHERE m.organization_id = ?
+			ORDER BY m.created_at ASC
+		`, member.OrganizationID).Scan(c.Request.Context(), &memberList)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, "failed to fetch members")
 			return
-		}
-
-		memberList := make([]gin.H, 0, len(members))
-		for _, m := range members {
-			memberList = append(memberList, gin.H{
-				"id":      m.ID.String(),
-				"user_id": m.UserID,
-				"role":    m.Role,
-			})
 		}
 
 		Success(c, gin.H{

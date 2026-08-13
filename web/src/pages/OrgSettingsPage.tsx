@@ -75,11 +75,12 @@ export default function OrgSettingsPage() {
           <CardContent className="pt-4">
             <div className="space-y-3">
               {data.members.map((member) => (
-                <div key={member.id} className="flex items-center justify-between">
-                  <span className="text-sm font-medium truncate">
-                    {member.user_id}
-                  </span>
-                  <Badge variant="secondary">{t(`org.role.${member.role}`)}</Badge>
+                <div key={member.id} className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{member.name || member.user_id}</p>
+                    {member.email && <p className="text-xs text-muted-foreground truncate">{member.email}</p>}
+                  </div>
+                  <Badge variant="secondary" className="shrink-0">{t(`org.role.${member.role}`)}</Badge>
                 </div>
               ))}
             </div>

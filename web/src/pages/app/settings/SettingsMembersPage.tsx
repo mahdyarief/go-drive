@@ -106,7 +106,10 @@ export default function SettingsMembersPage() {
             <div key={member.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
               <div className="flex min-w-0 items-center gap-2">
                 <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm font-mono">{member.user_id}</span>
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-medium">{member.name || member.user_id}</span>
+                  {member.email && <span className="truncate text-xs text-muted-foreground">{member.email}</span>}
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Badge variant="secondary">{roleLabel(member.role, t)}</Badge>
