@@ -300,7 +300,7 @@ export default function OrganizationsPage() {
                   {orgStorage.stores.map((s) => (
                     <tr key={s.id} className="border-t">
                       <td className="px-4 py-2 font-medium">{s.name}</td>
-                      <td className="px-4 py-2 text-muted-foreground">{providerLabel(s.provider)}</td>
+                      <td className="px-4 py-2 text-muted-foreground">{providerLabel(t, s.provider)}</td>
                       <td className="px-4 py-2">
                         <Badge variant={s.status === 'active' ? 'secondary' : 'outline'}>{s.status}</Badge>
                       </td>
