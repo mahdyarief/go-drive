@@ -44,9 +44,9 @@ export function DashboardRecentActivity() {
           ))}
         </ul>
       ) : query.isError ? (
-        <p className="text-sm text-destructive">{t('dashboard.error')}</p>
+        <p className="rounded-lg border border-border px-4 py-3 text-sm text-destructive">{t('dashboard.error')}</p>
       ) : logs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('dashboard.emptyActivity')}</p>
+        <p className="rounded-lg border border-border px-4 py-3 text-sm text-muted-foreground">{t('dashboard.emptyActivity')}</p>
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border">
           {logs.map((log) => (
