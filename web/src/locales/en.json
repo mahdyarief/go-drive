@@ -7,12 +7,7 @@
     "tenantContext": "Tenant Context",
     "tenantIsolationDemo": "Each organization gets its own Postgres schema (schema-per-tenant). This page shows which schema your session is isolated to.",
     "searchPlaceholder": "Search files...",
-    "toggleTheme": "Toggle theme",
-    "systemStatus": "System status",
-    "tenantSchema": "Schema",
-    "tenantRole": "Role",
-    "lastSync": "Last sync",
-    "noSyncRuns": "No sync runs yet"
+    "toggleTheme": "Toggle theme"
   },
   "auth": {
     "signIn": "Sign In",
@@ -425,7 +420,7 @@
     "uploaded": "Upload complete.",
     "uploadError": "Upload failed.",
     "searchPlaceholder": "Search files...",
-    "searchResults": "{count} results for \"{query}\"",
+    "searchResults": "{{count}} results for \"{{query}}\"",
     "clearSearch": "Clear search",
     "noSearchResults": "No results for \"{{query}}\".",
     "filters": "Filters",

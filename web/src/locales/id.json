@@ -7,12 +7,7 @@
     "tenantContext": "Konteks Tenant",
     "tenantIsolationDemo": "Setiap organisasi memiliki schema Postgres sendiri (schema-per-tenant). Halaman ini menunjukkan schema tempat sesi Anda diisolasi.",
     "searchPlaceholder": "Cari file...",
-    "toggleTheme": "Ganti tema",
-    "systemStatus": "Status sistem",
-    "tenantSchema": "Skema",
-    "tenantRole": "Peran",
-    "lastSync": "Sinkronisasi terakhir",
-    "noSyncRuns": "Belum ada sinkronisasi"
+    "toggleTheme": "Ganti tema"
   },
   "auth": {
     "signIn": "Masuk",
@@ -425,7 +420,7 @@
     "uploaded": "Unggahan selesai.",
     "uploadError": "Unggahan gagal.",
     "searchPlaceholder": "Cari file...",
-    "searchResults": "{count} hasil untuk \"{query}\"",
+    "searchResults": "{{count}} hasil untuk \"{{query}}\"",
     "clearSearch": "Bersihkan pencarian",
     "noSearchResults": "Tidak ada hasil untuk \"{{query}}\".",
     "filters": "Filter",
