@@ -65,6 +65,17 @@ func UploadFile(db *bun.DB) gin.HandlerFunc {
 		// policy does not pile every file of one batch onto a single store.
 		reserved := make(map[uuid.UUID]int64)
 
+		// Enforce the org's allocated storage quota (local providers only)
+		// before writing anything — reject the whole batch with 413.
+		var batchSize int64
+		for _, h := range headers {
+			batchSize += h.Size
+		}
+		if err := checkOrgUploadQuota(c.Request.Context(), db, tx, c.GetString("org_slug"), batchSize); err != nil {
+			Err(c, http.StatusRequestEntityTooLarge, err.Error())
+			return
+		}
+
 		for _, h := range headers {
 			f, err := uploadOne(c, tx, userID, folderID, h, reserved)
 			if err != nil {

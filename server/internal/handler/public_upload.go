@@ -52,6 +52,17 @@ func PublicUploadByAPIKey(db *bun.DB) gin.HandlerFunc {
 		uploaded := make([]uploadedFile, 0, len(headers))
 		failed := make([]failedUpload, 0)
 
+		// Enforce the org's allocated storage quota (local providers only)
+		// before writing anything — reject the whole batch with 413.
+		var batchSize int64
+		for _, h := range headers {
+			batchSize += h.Size
+		}
+		if err := checkOrgUploadQuota(c.Request.Context(), db, tx, c.GetString("org_slug"), batchSize); err != nil {
+			Err(c, http.StatusRequestEntityTooLarge, err.Error())
+			return
+		}
+
 		for _, h := range headers {
 			f, err := uploadOnePublic(c, tx, userID, folderID, h)
 			if err != nil {

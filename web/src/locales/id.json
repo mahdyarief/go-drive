@@ -84,7 +84,14 @@
     "changeRole": "Ubah Peran",
     "orgCreated": "Organisasi dibuat",
     "orgDeleted": "Organisasi dihapus",
-    "backToHome": "Kembali ke Beranda"
+    "backToHome": "Kembali ke Beranda",
+    "storageQuota": "Kuota Penyimpanan",
+    "quotaUnlimited": "Tak terbatas",
+    "quotaGb": "Kuota (GB)",
+    "quotaUnlimitedHint": "0 = tanpa batas",
+    "setQuota": "Atur Kuota",
+    "savingQuota": "Menyimpan...",
+    "quotaOwnerOnly": "Hanya pemilik organisasi yang dapat mengubah kuota."
   },
   "pnr": {
     "title": "Manajemen PNR",
@@ -378,7 +385,22 @@
     "passwordHint": "Kosongkan untuk mempertahankan kata sandi saat ini",
     "userCreated": "Pengguna dibuat",
     "userUpdated": "Pengguna diperbarui",
-    "creating": "Membuat..."
+    "creating": "Membuat...",
+    "quota": "Kuota",
+    "editQuota": "Edit Kuota",
+    "quotaGb": "Kuota (GB)",
+    "unlimited": "Tak terbatas",
+    "allocated": "Dialokasikan",
+    "attachedStorage": "Storage terpasang",
+    "viewStorage": "Lihat Storage",
+    "localStores": "Store lokal",
+    "gdriveStores": "Store Google Drive",
+    "storeCapacity": "Kapasitas store",
+    "quotaLimit": "Batas kuota",
+    "provider": "Penyedia",
+    "noStores": "Belum ada penyimpanan",
+    "orgQuotaAllocation": "Alokasi kuota org",
+    "close": "Tutup"
   },
   "files": {
     "title": "File",

@@ -43,6 +43,7 @@ export interface OrgDetailsData {
     name: string
     slug: string
     created_at: string
+    quota_limit: number
   }
   members: {
     id: string
@@ -67,6 +68,10 @@ export interface AdminOrg {
   slug: string
   created_at?: string
   member_count?: number
+  store_count?: number
+  gdrive_store_count?: number
+  store_capacity?: number
+  attached_quota?: number
 }
 
 export interface AdminOrgMember {
@@ -94,6 +99,8 @@ export interface AdminUser {
   created_at: string
   is_admin: boolean
   org_count: number
+  quota_limit: number
+  quota_allocated: number
 }
 
 export interface GDriveSettings {
@@ -157,6 +164,7 @@ export interface BreadcrumbItem {
 export interface StorageUsage {
   used: number
   limit: number
+  allocated: number
   fileCount: number
   folderCount: number
   percentage: number

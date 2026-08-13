@@ -59,6 +59,7 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		authed.GET("/orgs", handler.ListOrgs(db))
 		authed.GET("/orgs/:slug", handler.GetOrg(db))
 		authed.PATCH("/orgs/:slug", handler.UpdateOrg(db))
+		authed.PATCH("/orgs/:slug/quota", handler.SetOrgQuota(db))
 		authed.DELETE("/orgs/:slug", handler.DeleteOrg(db))
 		authed.POST("/orgs/:slug/members", handler.AddMember(db))
 		authed.DELETE("/orgs/:slug/members/:userId", handler.RemoveMember(db))
@@ -154,10 +155,12 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		admin.GET("/orgs/:slug", handler.AdminGetOrg(db))
 		admin.PATCH("/orgs/:slug", handler.AdminUpdateOrg(db))
 		admin.DELETE("/orgs/:slug", handler.AdminDeleteOrg(db))
+		admin.GET("/orgs/:slug/storage", handler.AdminOrgStorage(db))
 
 		admin.GET("/users", handler.AdminListUsers(db))
 		admin.POST("/users", handler.AdminCreateUser(auth, db))
 		admin.PATCH("/users/:id", handler.AdminUpdateUser(auth, db))
+		admin.PATCH("/users/:id/limit", handler.AdminSetUserLimit(db))
 		admin.DELETE("/users/:id", handler.AdminDeleteUser(db))
 
 		// Google Drive settings (OAuth user flow)

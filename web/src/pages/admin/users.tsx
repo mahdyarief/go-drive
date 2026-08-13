@@ -26,7 +26,8 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from '@/components/ui/alert-dialog'
-import { ShieldCheck, Shield, Users, Trash2, UserPlus, Pencil } from 'lucide-react'
+import { ShieldCheck, Shield, Users, Trash2, UserPlus, Pencil, HardDrive } from 'lucide-react'
+import { formatBytes } from '@/pages/app/stores/stores'
 
 interface AdminUserListData {
   users: AdminUser[]
@@ -43,6 +44,8 @@ export default function UsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null)
+  const [quotaTarget, setQuotaTarget] = useState<AdminUser | null>(null)
+  const [quotaLimit, setQuotaLimit] = useState('')
 
   const { data: users = [], isLoading, isError } = useQuery({
     queryKey: ['admin', 'users'],
@@ -82,6 +85,19 @@ export default function UsersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
       setEditTarget(null)
+    },
+  })
+
+  const setUserQuota = useMutation({
+    mutationFn: ({ id, limit }: { id: string; limit: number }) =>
+      adminApi<void>(`/api/admin/users/${id}/limit`, {
+        method: 'PATCH',
+        body: JSON.stringify({ limit }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      setQuotaTarget(null)
+      setQuotaLimit('')
     },
   })
 
@@ -127,6 +143,7 @@ export default function UsersPage() {
                 <th className="px-4 py-2 text-left">{t('admin.email')}</th>
                 <th className="px-4 py-2 text-left">{t('admin.createdAt')}</th>
                 <th className="px-4 py-2 text-center">{t('admin.orgs')}</th>
+                <th className="px-4 py-2 text-left">{t('admin.quota')}</th>
                 <th className="px-4 py-2 text-center">{t('admin.status')}</th>
                 <th className="px-4 py-2 text-right">{t('admin.actions')}</th>
               </tr>
@@ -134,7 +151,7 @@ export default function UsersPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-4 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
                     {t('admin.noUsers')}
                   </td>
                 </tr>
@@ -146,6 +163,30 @@ export default function UsersPage() {
                     <td className="px-4 py-3 text-muted-foreground">{formatDate(u.created_at)}</td>
                     <td className="px-4 py-3 text-center">
                       <Badge variant="secondary">{u.org_count}</Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs">
+                          {u.quota_limit > 0 ? formatBytes(u.quota_limit) : t('admin.unlimited')}
+                          {u.quota_allocated > 0 && (
+                            <span className="text-muted-foreground">
+                              {' '}
+                              · {t('admin.allocated')} {formatBytes(u.quota_allocated)}
+                            </span>
+                          )}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-1.5"
+                          onClick={() => {
+                            setQuotaTarget(u)
+                            setQuotaLimit(u.quota_limit > 0 ? String(Math.round(u.quota_limit / 1024 ** 3)) : '')
+                          }}
+                        >
+                          <HardDrive className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {u.is_admin ? (
@@ -311,6 +352,48 @@ export default function UsersPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!quotaTarget} onOpenChange={(open) => !open && setQuotaTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('admin.editQuota')}</DialogTitle>
+            <DialogDescription>{quotaTarget?.email}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="quota-gb">{t('admin.quotaGb')}</Label>
+              <Input
+                id="quota-gb"
+                type="number"
+                min={0}
+                step="any"
+                value={quotaLimit}
+                onChange={(e) => setQuotaLimit(e.target.value)}
+                placeholder="0 = unlimited"
+              />
+            </div>
+            {setUserQuota.isError && (
+              <p className="text-sm text-destructive">{setUserQuota.error?.message}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuotaTarget(null)}>
+              {t('admin.cancel')}
+            </Button>
+            <Button
+              disabled={setUserQuota.isPending}
+              onClick={() => {
+                if (!quotaTarget) return
+                const gb = Number(quotaLimit)
+                if (!Number.isFinite(gb) || gb < 0) return
+                setUserQuota.mutate({ id: quotaTarget.id, limit: Math.round(gb * 1024 ** 3) })
+              }}
+            >
+              {setUserQuota.isPending ? t('admin.saving') : t('admin.save')}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

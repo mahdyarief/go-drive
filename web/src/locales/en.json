@@ -84,7 +84,14 @@
     "changeRole": "Change Role",
     "orgCreated": "Organization created",
     "orgDeleted": "Organization deleted",
-    "backToHome": "Back to Home"
+    "backToHome": "Back to Home",
+    "storageQuota": "Storage Quota",
+    "quotaUnlimited": "Unlimited",
+    "quotaGb": "Quota (GB)",
+    "quotaUnlimitedHint": "0 = unlimited",
+    "setQuota": "Set Quota",
+    "savingQuota": "Saving...",
+    "quotaOwnerOnly": "Only the organization owner can change the quota."
   },
   "pnr": {
     "title": "PNR Management",
@@ -378,7 +385,22 @@
     "passwordHint": "Leave blank to keep current password",
     "userCreated": "User created",
     "userUpdated": "User updated",
-    "creating": "Creating..."
+    "creating": "Creating...",
+    "quota": "Quota",
+    "editQuota": "Edit Quota",
+    "quotaGb": "Quota (GB)",
+    "unlimited": "Unlimited",
+    "allocated": "Allocated",
+    "attachedStorage": "Attached storage",
+    "viewStorage": "View Storage",
+    "localStores": "Local stores",
+    "gdriveStores": "Google Drive stores",
+    "storeCapacity": "Store capacity",
+    "quotaLimit": "Quota limit",
+    "provider": "Provider",
+    "noStores": "No stores attached",
+    "orgQuotaAllocation": "Org quota allocation",
+    "close": "Close"
   },
   "files": {
     "title": "Files",

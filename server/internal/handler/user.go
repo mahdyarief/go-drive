@@ -62,12 +62,17 @@ func Me(db *bun.DB) gin.HandlerFunc {
 			})
 		}
 
+		quotaLimit, _ := userQuotaLimit(c.Request.Context(), db, userID)
+		quotaAllocated, _ := userQuotaAllocated(c.Request.Context(), db, userID)
+
 		Success(c, gin.H{
 			"user": gin.H{
-				"id":       userID,
-				"name":     userName,
-				"email":    userEmail,
-				"is_admin": isAdmin,
+				"id":              userID,
+				"name":            userName,
+				"email":           userEmail,
+				"is_admin":        isAdmin,
+				"quota_limit":     quotaLimit,
+				"quota_allocated": quotaAllocated,
 			},
 			"organizations": orgs,
 		})

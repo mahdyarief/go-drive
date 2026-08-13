@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useState } from 'react'
+import { OrgSettingsQuotaCard } from './OrgSettingsQuotaCard'
 
 export default function OrgSettingsPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -86,6 +87,8 @@ export default function OrgSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <OrgSettingsQuotaCard orgSlug={data.organization.slug} quotaLimit={data.organization.quota_limit} isOwner={isOwner} />
 
         {isOwner && (
           <Card className="border-destructive/50">

@@ -17,18 +17,22 @@ func AdminListUsers(db *bun.DB) gin.HandlerFunc {
 		ctx := c.Request.Context()
 
 		type userView struct {
-			ID        string    `json:"id"`
-			Name      string    `json:"name"`
-			Email     string    `json:"email"`
-			CreatedAt time.Time `json:"created_at"`
-			IsAdmin   bool      `json:"is_admin"`
-			OrgCount  int       `json:"org_count"`
+			ID             string    `json:"id"`
+			Name           string    `json:"name"`
+			Email          string    `json:"email"`
+			CreatedAt      time.Time `json:"created_at"`
+			IsAdmin        bool      `json:"is_admin"`
+			OrgCount       int       `json:"org_count"`
+			QuotaLimit     int64     `json:"quota_limit"`
+			QuotaAllocated int64     `json:"quota_allocated"`
 		}
 		var users []userView
 		err := db.NewRaw(`
 			SELECT u.id, u.name, u.email, u.created_at,
 				EXISTS(SELECT 1 FROM admins a WHERE a.user_id = u.id) AS is_admin,
-				(SELECT COUNT(*) FROM organization_members m WHERE m.user_id = CAST(u.id AS TEXT)) AS org_count
+				(SELECT COUNT(*) FROM organization_members m WHERE m.user_id = CAST(u.id AS TEXT)) AS org_count,
+				COALESCE((SELECT q.quota_limit FROM user_quotas q WHERE q.user_id = CAST(u.id AS TEXT)), 0) AS quota_limit,
+				(SELECT COALESCE(SUM(oq.quota_limit), 0) FROM org_quotas oq WHERE oq.owner_user_id = CAST(u.id AS TEXT)) AS quota_allocated
 			FROM users u
 			ORDER BY u.created_at DESC
 		`).Scan(ctx, &users)

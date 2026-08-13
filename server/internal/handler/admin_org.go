@@ -10,6 +10,7 @@ import (
 
 	"go-drive/server/internal/migrate"
 	"go-drive/server/internal/model"
+	"go-drive/server/internal/tenant"
 )
 
 // AdminListOrgs returns all organizations for the admin management page.
@@ -33,21 +34,54 @@ func AdminListOrgs(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 		type orgView struct {
-			ID          uuid.UUID `json:"id"`
-			Name        string    `json:"name"`
-			Slug        string    `json:"slug"`
-			CreatedAt   time.Time `json:"created_at"`
-			MemberCount int       `json:"member_count"`
+			ID            uuid.UUID `json:"id"`
+			Name          string    `json:"name"`
+			Slug          string    `json:"slug"`
+			CreatedAt     time.Time `json:"created_at"`
+			MemberCount   int       `json:"member_count"`
+			StoreCount    int       `json:"store_count"`
+			GDriveCount   int       `json:"gdrive_store_count"`
+			StoreCapacity int64     `json:"store_capacity"`
+			AttachedQuota int64     `json:"attached_quota"`
 		}
 		views := make([]orgView, 0, len(rows))
 		for _, r := range rows {
-			views = append(views, orgView{
+			v := orgView{
 				ID:          r.ID,
 				Name:        r.Name,
 				Slug:        r.Slug,
 				CreatedAt:   r.CreatedAt,
 				MemberCount: r.MemberCount,
-			})
+			}
+
+			// Stores live in the tenant schema — open a tenant tx per org
+			// (works for both Postgres search_path and SQLite file-per-tenant).
+			if tx, err := tenant.OpenTx(ctx, db, r.Slug); err == nil {
+				type storeSummary struct {
+					StoreCount    int   `bun:"store_count"`
+					GDriveCount   int   `bun:"gdrive_count"`
+					StoreCapacity int64 `bun:"store_capacity"`
+				}
+				var ss storeSummary
+				if err := tx.NewRaw(`
+					SELECT
+						COUNT(CASE WHEN status = 'active' THEN 1 END) AS store_count,
+						COUNT(CASE WHEN status = 'active' AND provider = 'gdrive' THEN 1 END) AS gdrive_count,
+						COALESCE(SUM(CASE WHEN status = 'active' AND provider != 'gdrive' THEN quota_limit ELSE 0 END), 0) AS store_capacity
+					FROM stores
+				`).Scan(ctx, &ss); err == nil {
+					v.StoreCount = ss.StoreCount
+					v.GDriveCount = ss.GDriveCount
+					v.StoreCapacity = ss.StoreCapacity
+				}
+				tx.Rollback()
+			}
+
+			if q, err := orgQuotaLimit(ctx, db, r.ID.String()); err == nil {
+				v.AttachedQuota = q
+			}
+
+			views = append(views, v)
 		}
 		Success(c, gin.H{"orgs": views})
 	}

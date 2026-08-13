@@ -99,6 +99,20 @@ func StorageUsage(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, "summing store quotas: "+err.Error())
 			return
 		}
+
+		// The org's admin-allocated quota (0 = unlimited) caps the store capacity.
+		// Quota only applies to local provider stores — gdrive capacity is per-org
+		// assigned and not counted toward the limit.
+		var allocated int64
+		_ = db.NewRaw(`
+			SELECT COALESCE(oq.quota_limit, 0)
+			FROM org_quotas oq
+			JOIN organizations o ON o.id = oq.organization_id
+			WHERE o.slug = ?
+		`, c.GetString("org_slug")).Scan(ctx, &allocated)
+		if allocated > 0 && (limit == 0 || allocated < limit) {
+			limit = allocated
+		}
 		percentage := 0.0
 		if limit > 0 {
 			percentage = float64(used) / float64(limit) * 100
@@ -107,6 +121,7 @@ func StorageUsage(db *bun.DB) gin.HandlerFunc {
 		Success(c, gin.H{
 			"used":        used,
 			"limit":       limit,
+			"allocated":   allocated,
 			"fileCount":   fileCount,
 			"folderCount": folderCount,
 			"percentage":  percentage,

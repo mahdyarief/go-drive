@@ -106,11 +106,13 @@ func ListOrgs(db *bun.DB) gin.HandlerFunc {
 
 		orgs := make([]gin.H, 0, len(members))
 		for _, m := range members {
+			quota, _ := orgQuotaLimit(c.Request.Context(), db, m.OrganizationID.String())
 			orgs = append(orgs, gin.H{
-				"id":   m.OrganizationID.String(),
-				"name": m.Organization.Name,
-				"slug": m.Organization.Slug,
-				"role": m.Role,
+				"id":          m.OrganizationID.String(),
+				"name":        m.Organization.Name,
+				"slug":        m.Organization.Slug,
+				"role":        m.Role,
+				"quota_limit": quota,
 			})
 		}
 
@@ -157,12 +159,15 @@ func GetOrg(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 
+		quota, _ := orgQuotaLimit(c.Request.Context(), db, member.OrganizationID.String())
+
 		Success(c, gin.H{
 			"organization": gin.H{
-				"id":         member.OrganizationID.String(),
-				"name":       member.Organization.Name,
-				"slug":       member.Organization.Slug,
-				"created_at": member.Organization.CreatedAt,
+				"id":          member.OrganizationID.String(),
+				"name":        member.Organization.Name,
+				"slug":        member.Organization.Slug,
+				"created_at":  member.Organization.CreatedAt,
+				"quota_limit": quota,
 			},
 			"members":   memberList,
 			"your_role": member.Role,

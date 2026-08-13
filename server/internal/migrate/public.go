@@ -47,6 +47,26 @@ func RunPublicMigrations(ctx context.Context, db *bun.DB) error {
 		return fmt.Errorf("creating admins table: %w", err)
 	}
 
+	// Per-user storage limits — admin assigns a quota to each user
+	// (0 = unlimited); owners then slice it across their orgs via org_quotas.
+	if _, err := db.NewCreateTable().
+		Model((*model.UserQuota)(nil)).
+		IfNotExists().
+		Exec(ctx); err != nil {
+		return fmt.Errorf("creating user_quotas table: %w", err)
+	}
+
+	// Per-org storage allocation — the slice of the owner's quota assigned
+	// to this org. Dropped automatically when the org is deleted so the
+	// owner's quota is freed again.
+	if _, err := db.NewCreateTable().
+		Model((*model.OrgQuota)(nil)).
+		IfNotExists().
+		ForeignKey(`("organization_id") REFERENCES "organizations" ("id") ON DELETE CASCADE`).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("creating org_quotas table: %w", err)
+	}
+
 	// Global app settings (key-value) — UI-managed config (e.g. register-disabled).
 	// Unqualified name: resolves to the `public` schema on Postgres, the main
 	// database on SQLite.
