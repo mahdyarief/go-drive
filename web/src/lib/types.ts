@@ -170,6 +170,31 @@ export interface StorageUsage {
   percentage: number
 }
 
+export interface SystemInfo {
+  cpu_pct: number
+  cpu_per_core: number[]
+  cpu_count: number
+  mem_total_mb: number
+  mem_used_mb: number
+  mem_available_mb: number
+  mem_pct: number
+  disk_total_gb: number
+  disk_used_gb: number
+  disk_free_gb: number
+  disk_pct: number
+  host: string
+  os: string
+  arch: string
+  pid: number
+  uptime_s: number
+  goroutines: number
+  heap_alloc_mb: number
+  proc_cpu_pct: number
+  proc_rss_mb: number
+  proc_threads: number
+  proc_fds: number
+}
+
 export interface Tag {
   id: string
   name: string

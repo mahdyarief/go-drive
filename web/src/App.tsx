@@ -13,6 +13,7 @@ import { AppLayout } from '@/components/app/AppLayout'
 import OrganizationsPage from '@/pages/admin/organizations'
 import UsersPage from '@/pages/admin/users'
 import AdminSettingsPage from '@/pages/admin/settings'
+import AdminSystemPage from '@/pages/admin/system'
 import LoginPage from '@/pages/LoginPage'
 import SignupPage from '@/pages/SignupPage'
 import OrgsPage from '@/pages/OrgsPage'
@@ -143,6 +144,7 @@ function App() {
               <Route index element={<Navigate to="organizations" replace />} />
               <Route path="organizations" element={<OrganizationsPage />} />
               <Route path="users" element={<UsersPage />} />
+              <Route path="system" element={<AdminSystemPage />} />
               <Route path="settings" element={<AdminSettingsPage />} />
             </Route>
           </Routes>

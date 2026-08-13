@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router'
-import { Settings, Building2, Users } from 'lucide-react'
+import { Settings, Building2, Users, Activity } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { cn } from '@/lib/utils'
 
 const adminNavItems = [
   { href: '/admin/organizations', label: 'Organizations', icon: Building2 },
   { href: '/admin/users', label: 'Users', icon: Users },
+  { href: '/admin/system', label: 'System', icon: Activity },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

@@ -173,6 +173,9 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 		// Registration settings
 		admin.GET("/settings/register", handler.AdminGetRegisterSetting(db))
 		admin.PUT("/settings/register", handler.AdminSaveRegisterSetting(db))
+
+		// System monitor (host + process resource usage)
+		admin.GET("/system", handler.AdminSystemInfo())
 	}
 
 	// Google Drive OAuth callback (PUBLIC — Google redirects here after consent)
