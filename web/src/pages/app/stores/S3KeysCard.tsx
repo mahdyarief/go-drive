@@ -326,7 +326,7 @@ rclone copy <remote>:hello.txt ./`}</pre>
             <div className="space-y-2">
               <p className="font-medium">{t('stores.s3ConnectAiAgent')}</p>
               <p className="text-xs text-muted-foreground">{t('stores.s3ConnectAiAgentNote')}</p>
-              <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs">{buildAiPrompt(s3Endpoint, isDev)}</pre>
+              <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs">{buildAiPrompt(s3Endpoint, bucket, isDev)}</pre>
               <Button variant="outline" size="sm" onClick={() => copyAiPrompt()}>
                 {t('stores.s3ConnectCopyAiPrompt')}
               </Button>
