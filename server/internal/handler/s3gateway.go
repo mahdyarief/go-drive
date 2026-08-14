@@ -379,8 +379,15 @@ func s3PutObject(c *gin.Context, db *bun.DB, key, userID string) {
 	}
 
 	// Phase 2: Upload file to storage (no database lock held)
+	// If the client sent aws-chunked encoding (boto3 default), decode the
+	// chunked framing before storing. Otherwise the raw chunk markers get
+	// persisted as part of the file content.
+	var bodyReader io.Reader = c.Request.Body
+	if strings.Contains(strings.ToLower(c.GetHeader("Content-Encoding")), "aws-chunked") {
+		bodyReader = newAWSChunkedReader(c.Request.Body)
+	}
 	h := md5.New()
-	body := io.TeeReader(c.Request.Body, h)
+	body := io.TeeReader(bodyReader, h)
 	if err := st.Upload(ctx, key, body, contentType); err != nil {
 		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
 		return
@@ -731,4 +738,83 @@ func s3ListBuckets(c *gin.Context, db *bun.DB) {
 			CreationDate: apiKey.CreatedAt.UTC().Format("2006-01-02T15:04:05.000Z"),
 		}},
 	})
+}
+
+// awsChunkedReader decodes AWS's chunked transfer encoding (aws-chunked).
+// Format: `chunk-size-hex\r\nchunk-data\r\n`, repeated, ending with
+// `0\r\n[trailers]\r\n\r\n`. Trailers are key:value pairs like
+// `x-amz-checksum-crc32:...`.
+type awsChunkedReader struct {
+	r       io.Reader
+	buf     []byte
+	rem     int
+	done    bool
+}
+
+func newAWSChunkedReader(r io.Reader) *awsChunkedReader {
+	return &awsChunkedReader{r: r, buf: make([]byte, 32*1024)}
+}
+
+func (a *awsChunkedReader) Read(p []byte) (int, error) {
+	if a.done {
+		return 0, io.EOF
+	}
+	if a.rem > 0 {
+		n := len(p)
+		if n > a.rem {
+			n = a.rem
+		}
+		nr, err := a.r.Read(p[:n])
+		a.rem -= nr
+		if a.rem == 0 && err == nil {
+			// Consume trailing \r\n after chunk data
+			_, _ = readUntil(a.r, '\n')
+		}
+		return nr, err
+	}
+	// Read next chunk size line
+	line, err := readUntil(a.r, '\n')
+	if err != nil {
+		return 0, err
+	}
+	// Strip \r
+	if len(line) > 0 && line[len(line)-1] == '\r' {
+		line = line[:len(line)-1]
+	}
+	// Parse hex size (may have `;chunk-signature=...` suffix)
+	sizeStr := string(line)
+	if idx := strings.Index(sizeStr, ";"); idx >= 0 {
+		sizeStr = sizeStr[:idx]
+	}
+	size, err := strconv.ParseInt(strings.TrimSpace(sizeStr), 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("aws-chunked: invalid chunk size: %w", err)
+	}
+	if size == 0 {
+		// Final chunk: skip trailers until \r\n\r\n
+		_, _ = readUntil(a.r, '\n') // first trailer line (or empty)
+		_, _ = readUntil(a.r, '\n') // second \r\n
+		a.done = true
+		return 0, io.EOF
+	}
+	a.rem = int(size)
+	return a.Read(p)
+}
+
+// readUntil reads bytes until delim (inclusive) and returns them (without delim).
+func readUntil(r io.Reader, delim byte) ([]byte, error) {
+	var out []byte
+	buf := make([]byte, 1)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			out = append(out, buf[0])
+			if buf[0] == delim {
+				return out, nil
+			}
+		}
+		if err != nil {
+			return out, err
+		}
+	}
 }
