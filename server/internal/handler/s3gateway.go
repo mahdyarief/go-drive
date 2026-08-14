@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect"
 
 	"go-drive/server/internal/config"
 	"go-drive/server/internal/crypto"
@@ -86,6 +87,7 @@ func S3Gateway(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 		ok := false
+		txReleased := false
 		defer func() {
 			if !ok {
 				_ = tx.Rollback()
@@ -138,6 +140,29 @@ func S3Gateway(db *bun.DB) gin.HandlerFunc {
 		// and the multipart branches would never match.
 		_, hasUploads := q["uploads"]
 
+		// PutObject runs its own short transactions (see s3PutObject), so it
+		// needs the tenant's DB handle, not the shared auth transaction.
+		// Release the auth tx first: in SQLite mode the tenant pool is
+		// MaxOpenConns=1 and the auth tx holds that single connection —
+		// s3PutObject's BeginTx would deadlock waiting for it. All auth data
+		// is validated above, so committing is safe.
+		putDB := db
+		if method == http.MethodPut {
+			if db.Dialect().Name() == dialect.SQLite {
+				tdb, terr := tenant.DB(ctx, workspaceSlug)
+				if terr != nil {
+					s3Err(c, http.StatusNotFound, "NoSuchBucket", "workspace not found")
+					return
+				}
+				putDB = tdb
+			}
+			if err := tx.Commit(); err != nil {
+				s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
+				return
+			}
+			txReleased = true
+		}
+
 		switch {
 		case method == http.MethodHead && key == "":
 			c.Status(http.StatusOK) // bucket validated above
@@ -154,7 +179,7 @@ func S3Gateway(db *bun.DB) gin.HandlerFunc {
 		case method == http.MethodPut && q.Get("uploadId") != "" && q.Get("partNumber") != "":
 			s3UploadPart(c, tx, key, q.Get("uploadId"), q.Get("partNumber"))
 		case method == http.MethodPut:
-			s3PutObject(c, db, key, apiKey.UserID)
+			s3PutObject(c, putDB, key, apiKey.UserID)
 		case method == http.MethodPost && hasUploads:
 			s3CreateMultipartUpload(c, tx, key, apiKey.UserID)
 		case method == http.MethodPost && q.Get("uploadId") != "":
@@ -168,7 +193,9 @@ func S3Gateway(db *bun.DB) gin.HandlerFunc {
 		}
 		if !c.GetBool("s3_errored") {
 			ok = true
-			_ = tx.Commit()
+			if !txReleased {
+				_ = tx.Commit()
+			}
 		}
 	}
 }
@@ -287,6 +314,11 @@ func s3HeadObject(c *gin.Context, tx bun.IDB, key string) {
 
 // ------------------------------------------------------------------ put/delete
 
+// s3PutObject streams an object to the primary store in three phases (pending
+// row → storage upload → mark ready) so no DB transaction is held during the
+// slow I/O. db MUST be the tenant's database (Postgres: same *bun.DB; SQLite
+// mode: tenant_<slug>.db) — the tenant tables (folders, files, file_blobs)
+// live there, not in the main app DB.
 func s3PutObject(c *gin.Context, db *bun.DB, key, userID string) {
 	ctx := c.Request.Context()
 	if key == "" {
