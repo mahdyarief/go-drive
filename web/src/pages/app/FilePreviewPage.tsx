@@ -33,6 +33,7 @@ function formatBytes(bytes: number): string {
 }
 
 const isPreviewableImage = (mimeType: string) => mimeType.startsWith('image/')
+const isPreviewablePdf = (mimeType: string) => mimeType === 'application/pdf'
 
 export default function FilePreviewPage() {
   const { t } = useTranslation()
@@ -127,7 +128,7 @@ export default function FilePreviewPage() {
   }
 
   const tags = tagsQuery.data?.tags?.[fileId] ?? []
-  const showPreview = isPreviewableImage(file.mime_type)
+  const showPreview = isPreviewableImage(file.mime_type) || isPreviewablePdf(file.mime_type)
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
@@ -165,16 +166,24 @@ export default function FilePreviewPage() {
           {showPreview && (
             <div className="rounded-lg border bg-muted/50 p-4">
               {previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt={file.name}
-                  className="mx-auto max-h-96 rounded-lg object-contain"
-                />
+                isPreviewablePdf(file.mime_type) ? (
+                  <iframe
+                    src={previewUrl}
+                    title={file.name}
+                    className="mx-auto h-[600px] w-full rounded-lg border"
+                  />
+                ) : (
+                  <img
+                    src={previewUrl}
+                    alt={file.name}
+                    className="mx-auto max-h-96 rounded-lg object-contain"
+                  />
+                )
               ) : (
                 <div className="flex flex-col items-center gap-3 py-8">
                   <p className="text-sm text-muted-foreground">{t('files.previewHint')}</p>
-                  <Button variant="outline" onClick={handlePreview} disabled={downloadUrl.isPending}>
-                    {downloadUrl.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  <Button variant="outline" onClick={handlePreview} disabled={previewToken.isPending}>
+                    {previewToken.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                     <Eye className="h-4 w-4 mr-2" />
                     {t('files.showPreview')}
                   </Button>

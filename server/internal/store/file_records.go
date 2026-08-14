@@ -344,12 +344,19 @@ func CreatePendingFileUpload(ctx context.Context, tx bun.IDB, userID string, fol
 }
 
 // MarkFileUploadReady flips file + blob to ready and records the primary
-// blob_location (origin primary_upload).
+// blob_location (origin primary_upload). Also updates storage_provider from
+// the store record so it reflects the actual provider (e.g., "gdrive", "s3").
 func MarkFileUploadReady(ctx context.Context, tx bun.IDB, fileID, blobID, storeID uuid.UUID, storagePath string) error {
 	now := time.Now()
 
+	// Look up the store's provider to set storage_provider correctly
+	var store model.Store
+	if err := tx.NewSelect().Model(&store).Where("id = ?", storeID).Column("provider").Scan(ctx); err != nil {
+		return fmt.Errorf("store: looking up store provider: %w", err)
+	}
+
 	if _, err := tx.NewUpdate().Model((*model.File)(nil)).
-		Set("status = 'ready', storage_path = ?, updated_at = ?", storagePath, now).
+		Set("status = 'ready', storage_path = ?, storage_provider = ?, updated_at = ?", storagePath, store.Provider, now).
 		Where("id = ?", fileID).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("store: marking file ready: %w", err)
