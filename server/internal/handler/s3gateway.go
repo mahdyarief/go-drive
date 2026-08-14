@@ -154,7 +154,7 @@ func S3Gateway(db *bun.DB) gin.HandlerFunc {
 		case method == http.MethodPut && q.Get("uploadId") != "" && q.Get("partNumber") != "":
 			s3UploadPart(c, tx, key, q.Get("uploadId"), q.Get("partNumber"))
 		case method == http.MethodPut:
-			s3PutObject(c, tx, key, apiKey.UserID)
+			s3PutObject(c, db, key, apiKey.UserID)
 		case method == http.MethodPost && hasUploads:
 			s3CreateMultipartUpload(c, tx, key, apiKey.UserID)
 		case method == http.MethodPost && q.Get("uploadId") != "":
@@ -287,7 +287,7 @@ func s3HeadObject(c *gin.Context, tx bun.IDB, key string) {
 
 // ------------------------------------------------------------------ put/delete
 
-func s3PutObject(c *gin.Context, tx bun.IDB, key, userID string) {
+func s3PutObject(c *gin.Context, db *bun.DB, key, userID string) {
 	ctx := c.Request.Context()
 	if key == "" {
 		s3Err(c, http.StatusBadRequest, "InvalidRequest", "object key is required")
@@ -298,39 +298,55 @@ func s3PutObject(c *gin.Context, tx bun.IDB, key, userID string) {
 		s3Err(c, http.StatusBadRequest, "InvalidRequest", "invalid object key")
 		return
 	}
-	folderID, err := resolveOrCreateFolderChain(ctx, tx, userID, key)
-	if err != nil {
-		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
-		return
-	}
-	contentType := c.GetHeader("Content-Type")
-	if contentType == "" {
-		contentType = mime.TypeByExtension(filepath.Ext(name))
-	}
-	size := c.Request.ContentLength
-	if size <= 0 {
-		size = 0
-	}
-	// S3 PUT overwrites: drop any existing row at this key so the UNIQUE
-	// object_key constraint doesn't reject the re-upload.
-	if existing, err := findFileByKey(ctx, tx, key); err == nil {
-		if err := store.DeleteFileEverywhere(ctx, tx, existing.ID); err != nil {
-			s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
-			return
+
+	// Phase 1: Prepare and create pending record (short transaction)
+	var blob *model.FileBlob
+	var f *model.File
+	var st storage.Storage
+	var s *model.Store
+	var contentType string
+	err := func() error {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
 		}
-	}
-	blob, f, err := store.CreatePendingFileUpload(ctx, tx, userID, folderID, name, key, contentType, size)
-	if err != nil {
-		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
-		return
-	}
-	st, s, err := buildGatewayStorage(ctx, tx)
+		defer tx.Rollback()
+
+		folderID, err := resolveOrCreateFolderChain(ctx, tx, userID, key)
+		if err != nil {
+			return err
+		}
+		contentType = c.GetHeader("Content-Type")
+		if contentType == "" {
+			contentType = mime.TypeByExtension(filepath.Ext(name))
+		}
+		size := c.Request.ContentLength
+		if size <= 0 {
+			size = 0
+		}
+		// S3 PUT overwrites: drop any existing row at this key so the UNIQUE
+		// object_key constraint doesn't reject the re-upload.
+		if existing, err := findFileByKey(ctx, tx, key); err == nil {
+			if err := store.DeleteFileEverywhere(ctx, tx, existing.ID); err != nil {
+				return err
+			}
+		}
+		blob, f, err = store.CreatePendingFileUpload(ctx, tx, userID, folderID, name, key, contentType, size)
+		if err != nil {
+			return err
+		}
+		st, s, err = buildGatewayStorage(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return tx.Commit()
+	}()
 	if err != nil {
 		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
 		return
 	}
 
-	// Stream the body to the primary store while computing the MD5 ETag.
+	// Phase 2: Upload file to storage (no database lock held)
 	h := md5.New()
 	body := io.TeeReader(c.Request.Body, h)
 	if err := st.Upload(ctx, key, body, contentType); err != nil {
@@ -339,12 +355,24 @@ func s3PutObject(c *gin.Context, tx bun.IDB, key, userID string) {
 	}
 	etag := `"` + hex.EncodeToString(h.Sum(nil)) + `"`
 
-	if err := store.MarkFileUploadReady(ctx, tx, f.ID, blob.ID, s.ID, key); err != nil {
+	// Phase 3: Mark file as ready (short transaction)
+	tx2, err := db.BeginTx(ctx, nil)
+	if err != nil {
 		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
 		return
 	}
-	if mode, err := store.GetStorageMode(ctx, tx); err == nil && mode == "replicate" {
-		_ = store.SyncFileToStores(ctx, tx, f.ID, nil, nil, userID)
+	defer tx2.Rollback()
+
+	if err := store.MarkFileUploadReady(ctx, tx2, f.ID, blob.ID, s.ID, key); err != nil {
+		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
+		return
+	}
+	if mode, err := store.GetStorageMode(ctx, tx2); err == nil && mode == "replicate" {
+		_ = store.SyncFileToStores(ctx, tx2, f.ID, nil, nil, userID)
+	}
+	if err := tx2.Commit(); err != nil {
+		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
+		return
 	}
 
 	c.Header("ETag", etag)
