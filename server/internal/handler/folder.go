@@ -232,6 +232,7 @@ func UpdateFolder(db *bun.DB) gin.HandlerFunc {
 }
 
 // DeleteFolder removes a folder and all descendants; files inside move to root.
+// Query param with_files=true deletes files from storage + DB instead.
 func DeleteFolder(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
@@ -248,13 +249,26 @@ func DeleteFolder(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusNotFound, "folder not found")
 			return
 		}
-		n, err := store.DeleteFolderRecursive(ctx, tx, id)
-		if err != nil {
-			Err(c, http.StatusInternalServerError, err.Error())
-			return
+
+		withFiles := c.Query("with_files") == "true"
+
+		if withFiles {
+			foldersDeleted, filesDeleted, err := store.DeleteFolderRecursiveWithFiles(ctx, tx, id)
+			if err != nil {
+				Err(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+			auditLog(ctx, tx, userID, "folder_delete_with_files", "folder", id.String(), map[string]any{"name": f.Name, "files_deleted": filesDeleted})
+			Success(c, gin.H{"folders_deleted": foldersDeleted, "files_deleted": filesDeleted})
+		} else {
+			n, err := store.DeleteFolderRecursive(ctx, tx, id)
+			if err != nil {
+				Err(c, http.StatusInternalServerError, err.Error())
+				return
+			}
+			auditLog(ctx, tx, userID, "folder_delete", "folder", id.String(), map[string]any{"name": f.Name})
+			Success(c, gin.H{"deleted": n})
 		}
-		auditLog(ctx, tx, userID, "folder_delete", "folder", id.String(), map[string]any{"name": f.Name})
-		Success(c, gin.H{"deleted": n})
 	}
 }
 
