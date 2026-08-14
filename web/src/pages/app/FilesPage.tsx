@@ -180,7 +180,7 @@ export default function FilesPage() {
   })
 
   const uploadFiles = useMutation({
-    mutationFn: (files: FileList) => uploadBatch(Array.from(files), orgSlug!, currentFolderId),
+    mutationFn: (files: File[]) => uploadBatch(files, orgSlug!, currentFolderId),
     onSuccess: () => {
       invalidate()
     },
@@ -244,7 +244,7 @@ export default function FilesPage() {
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files
     if (selected && selected.length > 0) {
-      uploadFiles.mutate(selected)
+      uploadFiles.mutate(Array.from(selected))
       e.target.value = ''
     }
   }
@@ -325,7 +325,7 @@ export default function FilesPage() {
   const drawerTags = detailsTarget?.file ? ((isSearching ? searchTags : fileTags)[detailsTarget.file.id] ?? []) : []
 
   return (
-    <FileDropZone onFiles={(droppedFiles) => uploadFiles.mutate(droppedFiles)}>
+    <FileDropZone onFiles={(droppedFiles) => uploadFiles.mutate(Array.from(droppedFiles))}>
       <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
