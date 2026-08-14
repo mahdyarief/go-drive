@@ -358,7 +358,9 @@ func s3PutObject(c *gin.Context, db *bun.DB, key, userID string) {
 		}
 		// S3 PUT overwrites: drop any existing row at this key so the UNIQUE
 		// object_key constraint doesn't reject the re-upload.
+		var hadExisting bool
 		if existing, err := findFileByKey(ctx, tx, key); err == nil {
+			hadExisting = true
 			if err := store.DeleteFileEverywhere(ctx, tx, existing.ID); err != nil {
 				return err
 			}
@@ -370,6 +372,14 @@ func s3PutObject(c *gin.Context, db *bun.DB, key, userID string) {
 		st, s, err = buildGatewayStorage(ctx, tx)
 		if err != nil {
 			return err
+		}
+		// Delete the old file from the storage backend. DB-only cleanup
+		// (DeleteFileEverywhere) is enough for Local storage (same path =
+		// overwrite on disk), but GDrive creates a new file ID per upload —
+		// without this the old GDrive file is orphaned and shows as a
+		// duplicate alongside the new one.
+		if hadExisting {
+			_ = st.Delete(ctx, key)
 		}
 		return tx.Commit()
 	}()
