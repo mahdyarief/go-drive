@@ -72,8 +72,8 @@ export default function FilePreviewPage() {
   })
 
   const handlePreview = () => {
-    downloadUrl.mutate(undefined, {
-      onSuccess: (data) => setPreviewUrl(data.url),
+    previewToken.mutate(undefined, {
+      onSuccess: (data) => setPreviewUrl(window.location.origin + data.url),
     })
   }
 
