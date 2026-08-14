@@ -38,7 +38,10 @@ export default function StoresPage() {
   // which breaks AWS SigV4 — so S3 clients must target the API port (:8081).
   const isDev = import.meta.env.DEV
   const serverBase = isDev ? 'http://localhost:8081' : window.location.origin
-  const s3Endpoint = `${serverBase}/api/s3/${orgSlug ?? ''}`
+  // The gateway is single-tenant: the org slug is the S3 bucket name, not
+  // part of the endpoint URL. Clients point at /api/s3 and address objects
+  // via the bucket (their workspace slug).
+  const s3Endpoint = `${serverBase}/api/s3`
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Store | null>(null)

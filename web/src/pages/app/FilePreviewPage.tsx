@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router'
@@ -9,9 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Check, Download, Eye, File as FileIcon, Link2, Loader2 } from 'lucide-react'
-
-const COPIED_RESET_MS = 2000
+import { ArrowLeft, Download, ExternalLink, Eye, File as FileIcon, Loader2 } from 'lucide-react'
 
 interface DownloadUrlData {
   url: string
@@ -43,8 +41,6 @@ export default function FilePreviewPage() {
   const currentOrg = useOrgStore((s) => s.currentOrg)
   const orgSlug = currentOrg?.slug
   const [previewUrl, setPreviewUrl] = useState('')
-  const [copied, setCopied] = useState(false)
-  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fileQuery = useQuery({
     queryKey: ['t', 'files', fileId, 'single', orgSlug],
@@ -87,16 +83,10 @@ export default function FilePreviewPage() {
     })
   }
 
-  const handleCopyLink = () => {
+  const handleOpenInNewTab = () => {
     previewToken.mutate(undefined, {
       onSuccess: (data) => {
-        const fullUrl = window.location.origin + data.url
-        navigator.clipboard.writeText(fullUrl).catch(() => {})
-        setCopied(true)
-        if (copyResetTimer.current) {
-          clearTimeout(copyResetTimer.current)
-        }
-        copyResetTimer.current = setTimeout(() => setCopied(false), COPIED_RESET_MS)
+        window.open(window.location.origin + data.url, '_blank', 'noopener,noreferrer')
       },
     })
   }
@@ -147,10 +137,10 @@ export default function FilePreviewPage() {
           {t('files.back')}
         </Button>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={handleCopyLink} disabled={previewToken.isPending}>
+          <Button variant="outline" onClick={handleOpenInNewTab} disabled={previewToken.isPending}>
             {previewToken.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            {copied ? <Check className="h-4 w-4 mr-2" /> : <Link2 className="h-4 w-4 mr-2" />}
-            {copied ? t('preview.copied') : t('preview.copyLink')}
+            <ExternalLink className="h-4 w-4 mr-2" />
+            {t('preview.openInNewTab')}
           </Button>
           <Button variant="outline" onClick={handleDownload} disabled={downloadUrl.isPending}>
             {downloadUrl.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}

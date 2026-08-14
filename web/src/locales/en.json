@@ -616,9 +616,11 @@
     "s3ConnectTitle": "Connect with an S3 client",
     "s3ConnectSubtitle": "Use the S3 API key with any S3-compatible tool such as the AWS CLI or rclone.",
     "s3ConnectStep1": "Create an API key above, then copy the Access Key ID and Secret Access Key.",
-    "s3ConnectStep2": "Point your S3 client at the endpoint below using the key credentials.",
+    "s3ConnectStep2": "Point your S3 client at the endpoint below using the key credentials, and use the bucket name (your workspace slug) for operations.",
     "s3ConnectEndpoint": "Endpoint URL",
     "s3ConnectCopyEndpoint": "Copy Endpoint",
+    "s3ConnectBucket": "Bucket name",
+    "s3ConnectCopyBucket": "Copy Bucket",
     "s3ConnectFeatures": "What you can do",
     "s3ConnectFeatureFolders": "Folders are created automatically when you upload to a key like docs/report.pdf — no separate mkdir step needed.",
     "s3ConnectFeatureList": "List objects at the bucket root or filter with a prefix.",
@@ -807,7 +809,8 @@
   },
   "preview": {
     "copyLink": "Copy preview link",
-    "copied": "Copied"
+    "copied": "Copied",
+    "openInNewTab": "Open file in new tab"
   },
   "dashboard": {
     "welcome": "Welcome back, {{name}}",

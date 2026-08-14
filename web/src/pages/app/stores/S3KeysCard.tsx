@@ -35,11 +35,12 @@ interface S3KeysCardProps {
 // block — used both by the rendered <pre> and the copy button so they can
 // never drift apart. The dev-only port note is appended only in development;
 // self-hosted deployments must not be told to use the :8081/:5173 split.
-function buildAiPrompt(s3Endpoint: string, isDev: boolean): string {
+function buildAiPrompt(s3Endpoint: string, bucket: string, isDev: boolean): string {
   const devNote = isDev
     ? 'Note: in development use the API port :8081, not the Vite proxy :5173\n(the proxy rewrites Host and breaks SigV4).'
     : ''
   return `S3 endpoint: ${s3Endpoint}
+Bucket name: ${bucket}
 Access key ID: <your access key>
 Secret access key: <your secret>
 Region: us-east-1
@@ -51,10 +52,10 @@ multipart upload (CreateMultipartUpload, UploadPart, CompleteMultipartUpload,
 AbortMultipartUpload, ListParts, ListMultipartUploads).
 
 To use with AWS CLI:
-aws --endpoint-url ${s3Endpoint} s3 ls s3://
-aws --endpoint-url ${s3Endpoint} s3 cp file.txt s3://hello.txt
+aws --endpoint-url ${s3Endpoint} s3 ls s3://${bucket}/
+aws --endpoint-url ${s3Endpoint} s3 cp file.txt s3://${bucket}/hello.txt
 
-To use with rclone: type=s3, provider=Other, endpoint=${s3Endpoint}.
+To use with rclone: type=s3, provider=Other, endpoint=${s3Endpoint}, bucket=${bucket}.
 ${devNote}`
 }
 
@@ -64,6 +65,7 @@ ${devNote}`
 export function S3KeysCard({ orgSlug, s3Endpoint, isDev }: S3KeysCardProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const bucket = orgSlug ?? ''
 
   const [keyName, setKeyName] = useState('')
   const [keyPermissions, setKeyPermissions] = useState('readwrite')
@@ -106,7 +108,7 @@ export function S3KeysCard({ orgSlug, s3Endpoint, isDev }: S3KeysCardProps) {
   // copyAiPrompt copies a ready-to-send instruction block so the user can
   // paste it into their AI agent to integrate with the S3 gateway.
   const copyAiPrompt = async () => {
-    const ok = await copyText(buildAiPrompt(s3Endpoint, isDev))
+    const ok = await copyText(buildAiPrompt(s3Endpoint, bucket, isDev))
     if (!ok) toast.error(t('stores.copyFailed'))
   }
 
@@ -271,6 +273,15 @@ export function S3KeysCard({ orgSlug, s3Endpoint, isDev }: S3KeysCardProps) {
               </div>
             </div>
             <div className="space-y-2">
+              <Label>{t('stores.s3ConnectBucket')}</Label>
+              <div className="flex gap-2">
+                <Input readOnly value={bucket} className="font-mono text-xs" />
+                <Button variant="outline" onClick={() => void copyWithFeedback(bucket)}>
+                  {t('stores.s3ConnectCopyBucket')}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
               <p className="font-medium">{t('stores.s3ConnectFeatures')}</p>
               <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
                 <li>{t('stores.s3ConnectFeatureFolders')}</li>
@@ -285,9 +296,9 @@ export function S3KeysCard({ orgSlug, s3Endpoint, isDev }: S3KeysCardProps) {
               <p className="font-medium">{t('stores.s3ConnectAwsCli')}</p>
               <p className="text-xs text-muted-foreground">{t('stores.s3ConnectAwsCliNote')}</p>
               <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs">{`aws configure
-aws --endpoint-url ${s3Endpoint} s3 ls s3://
-aws --endpoint-url ${s3Endpoint} s3 cp file.txt s3://hello.txt
-aws --endpoint-url ${s3Endpoint} s3 cp s3://hello.txt file.txt`}</pre>
+aws --endpoint-url ${s3Endpoint} s3 ls s3://${bucket}/
+aws --endpoint-url ${s3Endpoint} s3 cp file.txt s3://${bucket}/hello.txt
+aws --endpoint-url ${s3Endpoint} s3 cp s3://${bucket}/hello.txt file.txt`}</pre>
             </div>
             <div className="space-y-2">
               <p className="font-medium">{t('stores.s3ConnectRclone')}</p>
@@ -296,6 +307,7 @@ aws --endpoint-url ${s3Endpoint} s3 cp s3://hello.txt file.txt`}</pre>
   type = s3
   provider = Other
   endpoint = ${s3Endpoint}
+  bucket = ${bucket}
   access_key_id = <access key id>
   secret_access_key = <secret access key>
   region = us-east-1

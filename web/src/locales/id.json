@@ -616,9 +616,11 @@
     "s3ConnectTitle": "Hubungkan dengan klien S3",
     "s3ConnectSubtitle": "Gunakan kunci API S3 dengan alat apa pun yang kompatibel S3 seperti AWS CLI atau rclone.",
     "s3ConnectStep1": "Buat kunci API di atas, lalu salin Access Key ID dan Secret Access Key.",
-    "s3ConnectStep2": "Arahkan klien S3 Anda ke endpoint di bawah menggunakan kredensial kunci tersebut.",
+    "s3ConnectStep2": "Arahkan klien S3 Anda ke endpoint di bawah menggunakan kredensial kunci tersebut, dan gunakan nama bucket (slug workspace Anda) untuk operasi.",
     "s3ConnectEndpoint": "URL Endpoint",
     "s3ConnectCopyEndpoint": "Salin Endpoint",
+    "s3ConnectBucket": "Nama Bucket",
+    "s3ConnectCopyBucket": "Salin Bucket",
     "s3ConnectFeatures": "Yang bisa dilakukan",
     "s3ConnectFeatureFolders": "Folder dibuat otomatis saat Anda mengunggah ke key seperti docs/report.pdf — tidak perlu langkah mkdir terpisah.",
     "s3ConnectFeatureList": "List objek di root bucket atau filter dengan prefix.",
@@ -807,7 +809,8 @@
   },
   "preview": {
     "copyLink": "Salin tautan pratinjau",
-    "copied": "Tersalin"
+    "copied": "Tersalin",
+    "openInNewTab": "Buka file di tab baru"
   },
   "dashboard": {
     "welcome": "Selamat datang kembali, {{name}}",
