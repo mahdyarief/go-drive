@@ -38,8 +38,8 @@ func DB(ctx context.Context, slug string) (*bun.DB, error) {
 	}
 
 	// Same pragmas as the main DB: WAL + busy timeout + foreign keys +
-	// synchronous(NORMAL).
-	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)"
+	// synchronous(NORMAL). 60s busy_timeout handles concurrent write contention.
+	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(60000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)"
 	sqlDB, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err

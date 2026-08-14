@@ -87,16 +87,15 @@ func LocalStoreBaseDir(slug string) string {
 }
 
 // SQLiteMaxOpenConns returns the max open connections for SQLite pools from
-// SQLITE_MAX_OPEN_CONNS or the default (8). Mid-to-high traffic: WAL allows
-// concurrent readers, so a modest pool parallelizes reads; writes stay
-// serialized by the file lock and are absorbed by busy_timeout.
+// SQLITE_MAX_OPEN_CONNS or the default (1). Single connection serializes writes
+// to eliminate SQLITE_BUSY contention; reads still work via WAL concurrent readers.
 func SQLiteMaxOpenConns() int {
 	if v := os.Getenv("SQLITE_MAX_OPEN_CONNS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			return n
 		}
 	}
-	return 8
+	return 1
 }
 
 // NewDB creates a Bun database connection to the configured driver.
@@ -140,7 +139,8 @@ func newSQLiteDB() *bun.DB {
 	// WAL + busy timeout + foreign keys + synchronous(NORMAL) via modernc
 	// pragma DSN params. NORMAL is the recommended durability setting for WAL:
 	// commits skip fsync (only checkpoint syncs), giving much faster writes.
-	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)"
+	// 60s busy_timeout handles concurrent write contention on Fly volumes.
+	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(60000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)"
 	sqlDB, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
