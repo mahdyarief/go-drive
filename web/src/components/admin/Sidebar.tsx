@@ -50,7 +50,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto py-4">
-        <SidebarNav isCollapsed={isCollapsed} />
+        <SidebarNav isCollapsed={isCollapsed} onClose={onClose} />
       </div>
 
       <div className="border-t border-border p-3">

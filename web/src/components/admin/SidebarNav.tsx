@@ -12,12 +12,13 @@ const adminNavItems = [
 
 type NavItem = (typeof adminNavItems)[number]
 
-function NavLinkItem({ item, isCollapsed }: { item: NavItem; isCollapsed: boolean }) {
+function NavLinkItem({ item, isCollapsed, onClose }: { item: NavItem; isCollapsed: boolean; onClose: () => void }) {
   return (
     <NavLink
       key={item.href}
       to={item.href}
       end
+      onClick={onClose}
       className={({ isActive }) =>
         cn(
           'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
@@ -34,7 +35,7 @@ function NavLinkItem({ item, isCollapsed }: { item: NavItem; isCollapsed: boolea
   )
 }
 
-export function SidebarNav({ isCollapsed }: { isCollapsed: boolean }) {
+export function SidebarNav({ isCollapsed, onClose }: { isCollapsed: boolean; onClose: () => void }) {
   const isAdmin = useAuthStore((s) => s.isAdmin)
 
   if (!isAdmin) return null
@@ -50,7 +51,7 @@ export function SidebarNav({ isCollapsed }: { isCollapsed: boolean }) {
         Administration
       </p>
       {adminNavItems.map((item) => (
-        <NavLinkItem key={item.href} item={item} isCollapsed={isCollapsed} />
+        <NavLinkItem key={item.href} item={item} isCollapsed={isCollapsed} onClose={onClose} />
       ))}
     </nav>
   )

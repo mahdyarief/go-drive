@@ -67,43 +67,43 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-2">
-          <NavLink to="/" end className={linkClass}>
+          <NavLink to="/" end onClick={() => setMobileOpen(false)} className={linkClass}>
             <Home className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Home</span>
           </NavLink>
-          <NavLink to="/app/files" end className={linkClass}>
+          <NavLink to="/app/files" end onClick={() => setMobileOpen(false)} className={linkClass}>
             <Folder className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Files</span>
           </NavLink>
-          <RecentFolders collapsed={isCollapsed} />
-          <NavLink to="/app/links" end className={linkClass}>
+          <RecentFolders collapsed={isCollapsed} onClose={() => setMobileOpen(false)} />
+          <NavLink to="/app/links" end onClick={() => setMobileOpen(false)} className={linkClass}>
             <Link2 className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Links</span>
           </NavLink>
-          <NavLink to="/app/activity" end className={linkClass}>
+          <NavLink to="/app/activity" end onClick={() => setMobileOpen(false)} className={linkClass}>
             <History className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>{t('activity.nav')}</span>
           </NavLink>
           <div className={cn('mt-4 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground', isCollapsed && 'md:hidden')}>
             Settings
           </div>
-          <NavLink to="/app/settings/stores" end className={linkClass}>
+          <NavLink to="/app/settings/stores" end onClick={() => setMobileOpen(false)} className={linkClass}>
             <Database className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Stores</span>
           </NavLink>
-          <NavLink to="/app/settings/members" end className={linkClass}>
+          <NavLink to="/app/settings/members" end onClick={() => setMobileOpen(false)} className={linkClass}>
             <Users className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Members</span>
           </NavLink>
-          <NavLink to="/app/settings/appearance" end className={linkClass}>
+          <NavLink to="/app/settings/appearance" end onClick={() => setMobileOpen(false)} className={linkClass}>
             <Palette className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Appearance</span>
           </NavLink>
-          <NavLink to="/app/settings/notifications" end className={linkClass}>
+          <NavLink to="/app/settings/notifications" end onClick={() => setMobileOpen(false)} className={linkClass}>
             <Bell className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>Notifications</span>
           </NavLink>
-          <NavLink to="/app/api-docs" end className={linkClass}>
+          <NavLink to="/app/api-docs" end onClick={() => setMobileOpen(false)} className={linkClass}>
             <BookOpen className="h-4 w-4 shrink-0" />
             <span className={cn(isCollapsed && 'md:hidden')}>{t('apiDocs.nav')}</span>
           </NavLink>

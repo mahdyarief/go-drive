@@ -9,11 +9,12 @@ import { cn } from '@/lib/utils'
 
 interface RecentFoldersProps {
   collapsed: boolean
+  onClose?: () => void
 }
 
 // RecentFolders lists the most recently updated folders as a quick-nav
 // section in the sidebar. When collapsed, only the folder icons remain.
-export function RecentFolders({ collapsed }: RecentFoldersProps) {
+export function RecentFolders({ collapsed, onClose }: RecentFoldersProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const currentOrg = useOrgStore((s) => s.currentOrg)
@@ -45,7 +46,10 @@ export function RecentFolders({ collapsed }: RecentFoldersProps) {
             type="button"
             title={folder.name}
             aria-label={folder.name}
-            onClick={() => navigate(`/app/files?folder=${folder.id}`)}
+            onClick={() => {
+              onClose?.()
+              navigate(`/app/files?folder=${folder.id}`)
+            }}
             className={cn(
               'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
               collapsed && 'md:justify-center md:px-2',
