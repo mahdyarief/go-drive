@@ -1,343 +1,355 @@
 # go-drive
 
-Full-stack **Go/Gin + React 19** monorepo with email/password auth ([Authula](https://github.com/Authula/authula)), multi-tenant schema-per-tenant isolation on **Neon Postgres**, and single-binary deploy.
+**Self-hosted multi-tenant file management platform with an S3-compatible gateway.**
 
-Built for developers who want a clean, production-ready starting point with multi-tenancy out of the box.
+go-drive unifies multiple storage backends (S3, Google Drive, local filesystem) behind a single web UI and API. Each organization gets isolated storage, sharing controls, and programmatic access — deployable as one binary.
+
+![go-drive](https://img.shields.io/badge/status-active-success) ![License](https://img.shields.io/badge/license-MIT-blue) ![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go) ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
+
+---
+
+## What is go-drive?
+
+go-drive is a **storage aggregation layer** — think of it as a self-hosted alternative to services like Filebase or Storj DCS, but with built-in file management, sharing, and multi-tenancy.
+
+Instead of choosing one storage provider, go-drive lets you:
+
+- **Connect multiple backends** — AWS S3, Cloudflare R2, Google Drive, local disk — and use them together
+- **Route files intelligently** — set policies to send files to specific backends based on size, type, or cost tier
+- **Access via S3 API** — any S3-compatible tool (`aws s3`, `rclone`, `s3cmd`, SDK) works out of the box
+- **Share files securely** — time-limited links, password protection, download tracking
+- **Stay in control** — self-hosted, single binary, your data on your infrastructure
+
+### Who is it for?
+
+- **Teams** that need shared file storage with per-project or per-department isolation
+- **Developers** who want an S3-compatible API without managing raw bucket infrastructure
+- **Agencies** managing files for multiple clients under one roof
+- **Anyone** who wants Dropbox/Drive-like UX but on their own S3 or Google Drive account
+
+---
+
+## Key Features
+
+### Storage
+- **Multi-backend** — S3-compatible (AWS, R2, MinIO, Backblaze B2), Google Drive, local filesystem
+- **Routing policies** — send uploads to specific backends based on rules (size, type, cost tier)
+- **Storage tiering** — automatically move files between hot and cold backends based on age/access
+- **Quota management** — per-organization storage limits with enforcement
+
+### File Management
+- **Folder hierarchy** — nested folders with breadcrumbs and recent files
+- **Tags** — label files with custom tags for cross-folder organization
+- **Search** — full-text search across file names and metadata
+- **Batch operations** — move or delete multiple files at once
+- **Preview** — inline preview for images, PDFs, and documents
+
+### Sharing & Links
+- **Share links** — time-limited, password-protected download links
+- **Upload links** — let external users upload files to your storage without an account
+- **Tracked links** — monitor who accessed your files and when (analytics dashboard)
+
+### Access & Integration
+- **S3-compatible API** — full SigV4 authentication, works with `aws s3`, `rclone`, boto3, etc.
+- **External upload API** — API-key authenticated endpoint for programmatic uploads
+- **Webhooks** — real-time notifications on file events (upload, delete, share)
+- **Google Drive sync** — ingest existing Drive files into your go-drive workspace
+
+### Multi-Tenancy & Security
+- **Schema-per-tenant isolation** — each organization's data is fully isolated at the database level
+- **Role-based access** — owner, admin, member roles with granular permissions
+- **Audit log** — track every action across the platform
+- **Rate limiting** — per-tenant and per-endpoint rate limits
+- **API keys** — scoped credentials for external integrations
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- **Go** 1.22+ ([install](https://go.dev/dl/))
+- **Node.js** 20+ ([install](https://nodejs.org))
+- **PostgreSQL** — Neon, Supabase, or any Postgres 14+ instance
+- **Make** (pre-installed on macOS/Linux)
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/mahdyarief/go-drive.git
+cd go-drive
+make install
+```
+
+### 2. Configure environment
+
+```bash
+cp server/.env.example server/.env
+```
+
+Edit `server/.env`:
+
+```env
+# Required
+AUTHULA_SECRET=your-random-secret-here
+DATABASE_URL=postgres://user:password@host:5432/godrive
+
+# Optional
+PORT=8081
+AUTHULA_BASE_URL=http://localhost:8081
+```
+
+### 3. Run in development
+
+```bash
+make dev
+```
+
+This starts:
+- **Go server** on `http://localhost:8081` (API + auth)
+- **Vite dev server** on `http://localhost:5173` (React frontend with HMR)
+
+Open `http://localhost:5173`, create an account, and you're ready to go.
+
+### 4. Build for production
+
+```bash
+make build
+./dist/server
+```
+
+One binary, one port (`:8081`), serves API + frontend. No Nginx, no separate static server.
+
+---
+
+## Using the S3 Gateway
+
+go-drive exposes an S3-compatible API at `/api/s3`. Any tool that speaks S3 can connect:
+
+### Configure AWS CLI
+
+```bash
+aws configure
+# AWS Access Key ID: <your-api-key>
+# AWS Secret Access Key: <your-api-secret>
+# Default region: us-east-1
+# Default output format: json
+
+aws s3 ls --endpoint-url http://localhost:8081/api/s3
+```
+
+### Generate S3 credentials
+
+1. Log in to the web UI
+2. Go to **Settings → API Keys → S3 Keys**
+3. Create a new key pair
+4. Use the access key and secret in your S3 client
+
+### Supported operations
+
+- `ListBuckets` — `aws s3 ls`
+- `ListObjectsV2` — `aws s3 ls s3://bucket/`
+- `GetObject` — `aws s3 cp s3://bucket/key ./local-file`
+- `PutObject` — `aws s3 cp ./local-file s3://bucket/key`
+- `DeleteObject` — `aws s3 rm s3://bucket/key`
+- `HeadObject` — `aws s3api head-object --bucket bucket --key key`
+- Multipart uploads — `aws s3 cp` for large files
+
+The bucket name maps to your organization's workspace. All objects are stored in your configured storage backend.
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      React 19 Frontend                       │
+│              (Vite + Tailwind + shadcn/ui)                   │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ HTTP (same-origin in dev via Vite proxy)
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Go/Gin API Server                         │
+│  ┌──────────────┬──────────────┬──────────────────────────┐ │
+│  │ Auth (Authula)│ Org/Tenant   │ S3 Gateway (SigV4)       │ │
+│  │ Email+Pass   │ Middleware   │ File/Folder/Tag Handlers │ │
+│  └──────────────┴──────────────┴──────────────────────────┘ │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        ▼              ▼              ▼
+┌──────────────┐ ┌──────────┐ ┌──────────────┐
+│ Neon Postgres│ │ S3/MinIO │ │ Google Drive │
+│ (metadata +  │ │ (objects)│ │ (objects)    │
+│  multi-tenant│ └──────────┘ └──────────────┘
+│  schemas)    │
+└──────────────┘
+```
+
+### Multi-Tenancy Model
+
+go-drive uses **schema-per-tenant** isolation:
+
+- **Public schema** — users, sessions, organizations, memberships
+- **Tenant schemas** (`tenant_<slug>`) — each org gets its own schema with files, folders, tags, links, etc.
+- Requests are scoped via `SET LOCAL search_path` inside a transaction — no cross-tenant data leakage
+
+### Storage Routing
+
+Files can be routed to different backends based on:
+
+- **Manual selection** — user picks the backend at upload time
+- **Routing policy** — rules based on file size, MIME type, or custom tags
+- **Tiering policy** — automatic migration from hot (S3) to cold (Backblaze B2) after N days
+
+---
+
+## Project Structure
+
+```
+.
+├── server/                          # Go/Gin backend
+│   ├── cmd/server/
+│   │   ├── main.go                  # Entry point — wires DB, config, router
+│   │   └── static/                  # Embedded frontend (populated by make build)
+│   └── internal/
+│       ├── config/                  # Postgres + Authula config
+│       ├── handler/                 # HTTP handlers (one file per domain)
+│       │   ├── s3gateway.go         # S3-compatible API (SigV4)
+│       │   ├── file.go              # File CRUD + preview
+│       │   ├── folder.go            # Folder hierarchy
+│       │   ├── store.go             # Storage backend management
+│       │   ├── share.go             # Share/upload/tracked links
+│       │   ├── tiering.go           # Storage tiering automation
+│       │   └── webhook.go           # Webhook delivery
+│       ├── middleware/              # CORS, auth, tenant, rate limit
+│       ├── model/                   # Bun ORM models
+│       ├── migrate/                 # Schema migrations (public + tenant)
+│       ├── store/                   # Data access layer
+│       └── router/router.go         # Route registration
+├── web/                             # React 19 frontend
+│   └── src/
+│       ├── components/              # UI components (shadcn/ui + custom)
+│       ├── pages/                   # Route-level page components
+│       ├── store/                   # Zustand stores (auth, org, files)
+│       └── lib/                     # API client, i18n, utilities
+├── Makefile                         # dev, build, install, clean
+└── docs/                            # Deployment, database, troubleshooting
+```
+
+---
+
+## API Overview
+
+### Authentication
+
+- **Session-based** — email/password login, Bearer token in `Authorization` header
+- **S3 SigV4** — for `/api/s3/*` endpoints, using generated access keys
+- **API keys** — scoped keys for external upload endpoint (`POST /api/v1/uploads`)
+- **Public links** — token-authenticated share/upload/tracked links
+
+### Endpoints
+
+| Group | Path | Auth | Description |
+|-------|------|------|-------------|
+| Auth | `/auth/*` | None | Sign up, sign in, sign out (Authula) |
+| Public | `/api/health`, `/api/shared/*` | None | Health check, public link access |
+| S3 Gateway | `/api/s3/*` | SigV4 | S3-compatible object operations |
+| External | `/api/v1/uploads` | API Key | Programmatic file upload |
+| User | `/api/me`, `/api/orgs/*` | Session | Current user, organization management |
+| Tenant | `/api/t/*` | Session + X-Org-Slug | Files, folders, tags, links, stores, webhooks |
+| Admin | `/api/admin/*` | Session + Admin | System-wide user/org management |
+
+Full API documentation is available at `/app/api-docs` when running the app.
+
+---
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AUTHULA_SECRET` | Yes | — | Session signing secret (use `openssl rand -hex 32`) |
+| `DATABASE_URL` | Yes | — | Postgres connection string |
+| `PORT` | No | `8081` | Server port |
+| `AUTHULA_BASE_URL` | No | `http://localhost:8081` | Public URL for auth callbacks |
+
+---
+
+## Deployment
+
+### Single Binary
+
+```bash
+make build
+./dist/server
+```
+
+The binary embeds the frontend and serves everything on one port. Deploy it anywhere you can run a Go binary: VPS, Docker, Fly.io, Railway.
+
+### Docker
+
+```bash
+docker build -t go-drive .
+docker run -p 8081:8081 --env-file server/.env go-drive
+```
+
+### Fly.io
+
+A `fly.toml` is included. Deploy with:
+
+```bash
+fly launch
+fly deploy
+```
+
+See [docs/deployment.md](docs/deployment.md) for production checklist, reverse proxy setup, and TLS configuration.
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | [Go](https://go.dev) + [Gin](https://gin-gonic.com) |
-| Auth | [Authula](https://github.com/Authula/authula) (email/password + Bearer tokens) |
-| Database | [Neon Postgres](https://neon.tech) (schema-per-tenant) |
+| Backend | [Go](https://go.dev) 1.22+ / [Gin](https://gin-gonic.com) |
+| Auth | [Authula](https://github.com/Authula/authula) (email/password + sessions) |
+| Database | [Neon Postgres](https://neon.tech) (schema-per-tenant isolation) |
 | ORM | [Bun](https://bun.uptrace.dev) |
 | Frontend | [React 19](https://react.dev) + [TypeScript](https://www.typescriptlang.org) (React Compiler) |
 | Build | [Vite 8](https://vite.dev) |
 | CSS | [Tailwind CSS v4](https://tailwindcss.com) |
 | Components | [shadcn/ui](https://ui.shadcn.com) |
 | State | [Zustand](https://zustand-demo.pmnd.rs) |
+| Data Fetching | [TanStack Query](https://tanstack.com/query) |
+| i18n | [react-i18next](https://react.i18next.com) |
 
-## Project Structure
+---
 
-```
-.
-├── Makefile                             # dev, build, install, clean commands
-├── CLAUDE.md                            # AI assistant project instructions
-├── server/                              # Go/Gin backend (API + auth + embedded frontend)
-│   ├── CLAUDE.md                        # Go-specific guidelines
-│   ├── cmd/server/
-│   │   ├── main.go                      # Entry point — wires DB, config, migrations, router
-│   │   └── static/                      # Embedded frontend (populated by make build)
-│   ├── internal/
-│   │   ├── config/config.go             # Postgres connection + Authula config
-│   │   ├── handler/
-│   │   │   ├── health.go                # GET /api/health, /api/message
-│   │   │   ├── user.go                  # GET /api/me (protected)
-│   │   │   ├── org.go                   # Organization CRUD + member management
-│   │   │   ├── tenant.go                # Tenant-scoped endpoints
-│   │   │   ├── response.go              # JSON response envelope helpers
-│   │   │   └── static.go               # SPA routing for embedded frontend
-│   │   ├── middleware/
-│   │   │   ├── cors.go                  # CORS middleware
-│   │   │   ├── auth.go                  # Bearer token auth middleware
-│   │   │   └── tenant.go               # Tenant context + search_path isolation
-│   │   ├── model/
-│   │   │   ├── organization.go          # Organization model
-│   │   │   └── organization_member.go   # Membership + roles
-│   │   ├── migrate/
-│   │   │   ├── public.go               # Public schema migrations (users, orgs)
-│   │   │   └── tenant.go               # Per-tenant schema migrations
-│   │   └── router/router.go            # Mounts middleware, auth, API, org, tenant routes
-│   ├── go.mod / go.sum
-│   └── .env.example
-└── web/                                 # React 19 + TypeScript frontend
-    ├── CLAUDE.md                        # Frontend-specific guidelines
-    ├── package.json
-    ├── vite.config.ts                   # Vite + Tailwind + API proxy to :8081
-    ├── components.json                  # shadcn/ui configuration
-    └── src/
-        ├── App.tsx                      # React Router + AuthLoader
-        ├── main.tsx                     # App entry point
-        ├── index.css                    # Tailwind CSS v4 styles
-        ├── store/
-        │   ├── auth.ts                  # Auth state: signIn, signUp, signOut, user
-        │   └── org.ts                   # Org state: organizations, currentOrg, createOrg
-        ├── components/
-        │   ├── ProtectedRoute.tsx       # Redirects to /login if unauthenticated
-        │   ├── OrgGuard.tsx             # Redirects to /orgs if no org selected
-        │   ├── OrgSwitcher.tsx          # Org selection dropdown
-        │   ├── CreateOrgDialog.tsx      # Dialog for creating new organizations
-        │   └── ui/                      # shadcn/ui components (button, card, dialog, etc.)
-        ├── pages/
-        │   ├── LoginPage.tsx            # Email/password login
-        │   ├── SignupPage.tsx           # Account registration
-        │   ├── HomePage.tsx             # Main dashboard (org-scoped)
-        │   ├── OrgsPage.tsx             # Organization list + creation
-        │   └── OrgSettingsPage.tsx      # Organization settings (owner/admin)
-        ├── lib/
-        │   ├── api.ts                   # Typed fetch wrapper + tenantApi with X-Org-Slug
-        │   ├── types.ts                 # Shared TypeScript types
-        │   ├── query.ts                 # React Query configuration
-        │   ├── i18n.ts                  # Internationalization setup
-        │   └── utils.ts                 # cn() utility
-        └── locales/
-            └── en.json                  # English translations
-```
-
-## Prerequisites
-
-- **Go** 1.22+ ([install](https://go.dev/dl/))
-- **Node.js** 20+ ([install](https://nodejs.org))
-- **Make** (pre-installed on macOS/Linux)
-- **Neon Postgres** database ([sign up](https://neon.tech))
-
-## Quick Start
+## Development
 
 ```bash
-# Clone
-git clone https://github.com/calebeaires/gin-react-monorepo.git
-cd gin-react-monorepo
-
-# Install dependencies
-make install
-
-# Configure environment
-cp server/.env.example server/.env
-# Edit server/.env — set AUTHULA_SECRET and DATABASE_URL
-
-# Run both servers
-make dev
-```
-
-Server runs on `http://localhost:8081`, web on `http://localhost:5173`.
-
-Open `http://localhost:5173` — create an account at `/signup`, then create an organization to get started.
-
-## How Server and Web Communicate
-
-In **development**, two processes run independently:
-- Go server on `:8081` — serves `/api/*` and `/auth/*`
-- Vite dev server on `:5173` — serves the React app with hot reload
-- Vite proxies `/api` and `/auth` requests to `:8081` (configured in `web/vite.config.ts`)
-- Everything is same-origin, so Bearer tokens work without CORS issues
-
-In **production** (`make build`):
-- Vite builds the React app to static files
-- Static files are copied into `server/cmd/server/static/`
-- Go embeds them via `//go:embed static/*`
-- The single binary serves API + frontend on one port
-- `handler/static.go` handles SPA routing (unknown paths -> `index.html`)
-
-No Nginx, no separate static file server. One binary, one process, one port.
-
-## Multi-Tenancy Architecture
-
-The app uses **schema-per-tenant** isolation on Neon Postgres:
-
-- **Public schema** holds shared data: Authula tables (users, sessions), `organizations`, `organization_members`
-- **Tenant schemas** (`tenant_<slug>`) hold per-org business data, isolated via `SET LOCAL search_path`
-- Users are global — one account can belong to many organizations
-- Each request to `/api/t/*` requires an `X-Org-Slug` header
-
-### Request Flow (Tenant-Scoped)
-
-```
-Request → CORS → Auth Middleware → Tenant Middleware → Handler → Response
-                  (Bearer token)    (X-Org-Slug)       (tenant_tx)
-```
-
-1. CORS middleware allows `Authorization` and `X-Org-Slug` headers
-2. Auth middleware extracts Bearer token, queries Authula's `sessions` table directly, sets `user_id` in context
-3. Tenant middleware reads `X-Org-Slug`, verifies membership, begins transaction with `SET LOCAL search_path TO tenant_<slug>, public`
-4. Handler uses `tenant_tx` from context for all DB queries
-5. Tenant middleware commits or rolls back the transaction
-
-### Organization Lifecycle
-
-- **Create**: `POST /api/orgs` creates the org record + `tenant_<slug>` schema in one transaction
-- **Delete**: `DELETE /api/orgs/:slug` drops the schema + deletes the org record (owner only)
-- **Members**: Owners and admins can add/remove members and change roles
-
-### Roles
-
-| Role | Permissions |
-|------|------------|
-| `owner` | Full control — manage members, change roles, delete org |
-| `admin` | Manage members, update org name |
-| `member` | Access tenant-scoped data |
-
-## Auth Flow (Authula + Bearer Token)
-
-```
-Sign Up/In → Authula returns token → Stored in Zustand + localStorage
-                                          │
-                    Authorization: Bearer <token> on every API call
-                                          │
-              Auth middleware → sessions table lookup → user_id in context
-```
-
-1. Web calls `POST /auth/sign-up` or `POST /auth/sign-in`
-2. Authula validates credentials, creates a session, returns `{ user, session: { token } }`
-3. Frontend stores `session.token` in Zustand + `localStorage` (`session_token` key)
-4. All API calls include `Authorization: Bearer <token>` header (auto-injected by `api()` wrapper)
-5. Auth middleware queries Authula's `sessions` table directly via shared DB — no HTTP calls
-6. `AuthLoader` fetches `GET /api/me` on page load to restore user + orgs
-7. `ProtectedRoute` redirects to `/login` if no token; `OrgGuard` redirects to `/orgs` if no org selected
-
-**API response envelope**: All `/api/*` endpoints return `{ data, error, message }`. The `api()` wrapper auto-unwraps `data`. Auth endpoints (`/auth/*`) use Authula's own format — handled by `authFetch()` separately.
-
-## API Endpoints
-
-### Public
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/health` | Health check |
-| `GET` | `/api/message` | Test message |
-
-### Auth (Authula)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/auth/sign-up` | Create account |
-| `POST` | `/auth/sign-in` | Login |
-| `POST` | `/auth/sign-out` | Logout |
-
-### Authenticated (session required)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/me` | Current user + organizations |
-| `POST` | `/api/orgs` | Create organization |
-| `GET` | `/api/orgs` | List user's organizations |
-| `GET` | `/api/orgs/:slug` | Org details + members |
-| `PATCH` | `/api/orgs/:slug` | Update org name (owner/admin) |
-| `DELETE` | `/api/orgs/:slug` | Delete org + schema (owner) |
-| `POST` | `/api/orgs/:slug/members` | Add member (owner/admin) |
-| `DELETE` | `/api/orgs/:slug/members/:userId` | Remove member (owner/admin) |
-| `PATCH` | `/api/orgs/:slug/members/:userId` | Change member role (owner) |
-
-### Tenant-Scoped (session + X-Org-Slug header)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/t/status` | Tenant context info |
-
-## Environment Variables
-
-Set in `server/.env` (copied from `.env.example`):
-
-| Variable | Required | Default |
-|----------|----------|---------|
-| `AUTHULA_SECRET` | Yes | — |
-| `DATABASE_URL` | Yes | — |
-| `AUTHULA_BASE_URL` | No | `http://localhost:8081` |
-| `PORT` | No | `8081` |
-
-## Available Commands
-
-```bash
-make dev            # Run server + web in parallel
-make dev-server     # Server only (port 8081)
-make dev-web        # Web only (port 5173)
-make install        # Install all dependencies (Go + Node)
-make build          # Build single binary with embedded frontend → dist/server
+make install        # Install Go + Node dependencies
+make dev            # Run server (:8081) + web (:5173) in parallel
+make dev-server     # Server only
+make dev-web        # Web only
+make build          # Production build → dist/server
 make clean          # Remove build artifacts
 ```
 
-## Architecture Decisions
+### Adding a storage backend
 
-**Why Gin?** Minimal, fast, and the most popular Go web framework. No magic — just handlers and middleware.
+1. Create a new file in `server/internal/store/` implementing the `StorageBackend` interface
+2. Register it in `server/internal/handler/store.go`
+3. Add UI for configuration in `web/src/pages/app/settings/StoresPage.tsx`
 
-**Why `internal/`?** Go convention — code inside `internal/` can't be imported by external projects. Keeps the API surface clean.
+### Adding a new API endpoint
 
-**Why Authula?** Pluggable auth that lives in your codebase. No SaaS dependency, no vendor lock-in. Swap email/password for OAuth or TOTP by adding a plugin.
+1. Create handler in `server/internal/handler/`
+2. Register in `server/internal/router/router.go` (public, authed, or tenant group)
+3. For tenant-scoped endpoints, use `tenant_tx` from Gin context
 
-**Why Neon Postgres?** Serverless Postgres with branching for dev/staging. Schema-per-tenant isolation gives each organization its own namespace without managing separate databases.
+See [server/CLAUDE.md](server/CLAUDE.md) and [web/CLAUDE.md](web/CLAUDE.md) for detailed guidelines.
 
-**Why schema-per-tenant?** Strongest isolation without the operational overhead of database-per-tenant. Each org's data lives in `tenant_<slug>` and is accessed via `SET LOCAL search_path` within a transaction — no cross-tenant data leakage.
-
-**Why Bearer tokens over cookies?** Simpler for multi-tenant APIs where the frontend needs to send both auth and org context headers. Works consistently across same-origin and cross-origin setups.
-
-**Why Vite proxy?** The web app proxies `/api` and `/auth` to the server in development. This eliminates CORS issues because everything is same-origin.
-
-**Why shadcn/ui?** Components are copied into your project, not installed as a dependency. You own the code. Customize anything without fighting a library.
-
-**Why single binary?** Go embeds the built React app. Deploy one file, run one process. No reverse proxy, no static file server, no container orchestration needed for simple deployments.
-
-## Adding New Features
-
-- **New API endpoint**: Create handler in `server/internal/handler/`, register in `router.go`
-- **New tenant-scoped endpoint**: Add to `/api/t/` group in `router.go` (gets auth + tenant middleware automatically)
-- **New tenant table**: Add `CREATE TABLE` to `migrate/tenant.go`, use `tenant_tx` from Gin context in handlers
-- **New page**: Create in `web/src/pages/`, add route in `App.tsx`
-- **New UI component**: `cd web && npx shadcn@latest add <component>`
-- **Protected route**: Wrap with `<ProtectedRoute>` in `App.tsx`
-- **Org-required route**: Wrap with `<OrgGuard>` inside `<ProtectedRoute>`
-
-### Tutorial: Add a "Projects" Feature (End-to-End)
-
-Here's a complete walkthrough of adding a tenant-scoped feature — from database to UI.
-
-**Step 1 — Model** (`server/internal/model/project.go`):
-```go
-type Project struct {
-    bun.BaseModel `bun:"table:projects"`
-
-    ID        uuid.UUID `json:"id" bun:"id,pk,type:uuid,default:gen_random_uuid()"`
-    Name      string    `json:"name" bun:"name,notnull"`
-    CreatedAt time.Time `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
-}
-```
-
-**Step 2 — Migration** (add to `server/internal/migrate/tenant.go`):
-```go
-// Inside CreateTenantSchema(), after creating the schema:
-_, err = db.NewCreateTable().
-    ModelTableExpr(fmt.Sprintf("%s.projects", pq.QuoteIdentifier(schemaName))).
-    Model((*model.Project)(nil)).
-    IfNotExists().
-    Exec(ctx)
-```
-
-**Step 3 — Handler** (`server/internal/handler/project.go`):
-```go
-func ListProjects() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        tx := c.MustGet("tenant_tx").(bun.Tx)
-        var projects []model.Project
-        if err := tx.NewSelect().Model(&projects).Scan(c.Request.Context()); err != nil {
-            ErrorResponse(c, http.StatusInternalServerError, "Failed to list projects")
-            return
-        }
-        SuccessResponse(c, http.StatusOK, projects)
-    }
-}
-```
-
-**Step 4 — Route** (add to tenant group in `server/internal/router/router.go`):
-```go
-tenant.GET("/projects", handler.ListProjects())
-```
-
-**Step 5 — Frontend** (`web/src/pages/ProjectsPage.tsx`):
-```tsx
-export default function ProjectsPage() {
-  const { data: projects } = useQuery({
-    queryKey: ['projects'],
-    queryFn: () => tenantApi<Project[]>('/t/projects'),
-  })
-  return <div>{projects?.map(p => <div key={p.id}>{p.name}</div>)}</div>
-}
-```
-
-**Step 6 — Route** (add to `web/src/App.tsx` inside `<OrgGuard>`):
-```tsx
-<Route path="/projects" element={<ProjectsPage />} />
-```
-
-That's it — your feature is tenant-isolated, authenticated, and wired end-to-end.
+---
 
 ## Documentation
 
@@ -348,10 +360,32 @@ That's it — your feature is tenant-isolated, authenticated, and wired end-to-e
 | [Troubleshooting](docs/troubleshooting.md) | Common issues, debugging tips, manual API testing |
 | [Contributing](CONTRIBUTING.md) | Development workflow, code style, PR guidelines |
 
-## Contributing
+---
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow, code style, and PR guidelines.
+## Comparison
+
+| Feature | go-drive | Nextcloud | MinIO | Filebase |
+|---------|----------|-----------|-------|----------|
+| Self-hosted | ✅ | ✅ | ✅ | ❌ |
+| S3-compatible API | ✅ | ❌ | ✅ | ✅ |
+| Multi-backend aggregation | ✅ | ❌ | ❌ | ❌ |
+| Multi-tenant isolation | ✅ | ❌ | ❌ | ✅ |
+| File sharing links | ✅ | ✅ | ❌ | ❌ |
+| Upload links | ✅ | ❌ | ❌ | ❌ |
+| Link analytics | ✅ | ❌ | ❌ | ❌ |
+| Storage tiering | ✅ | ❌ | ❌ | ✅ |
+| Webhooks | ✅ | ✅ | ✅ | ❌ |
+| Single binary deploy | ✅ | ❌ | ❌ | N/A |
+| Google Drive integration | ✅ | ❌ | ❌ | ❌ |
+
+---
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — use it however you want, commercial or personal.
+
+---
+
+## Credits
+
+Built with Go, React, and too much coffee. Inspired by the need for a self-hosted storage solution that doesn't force you to choose between features and simplicity.
