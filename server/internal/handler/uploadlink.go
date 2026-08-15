@@ -23,12 +23,22 @@ func ListUploadLinks(db *bun.DB) gin.HandlerFunc {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		ctx := c.Request.Context()
 
+		p := ParsePagination(c)
+
+		q := tx.NewSelect().Model((*model.UploadLink)(nil)).Order("created_at DESC")
+
+		total, err := q.Count(ctx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting upload links: "+err.Error())
+			return
+		}
+
 		var links []model.UploadLink
-		if err := tx.NewSelect().Model(&links).Order("created_at DESC").Scan(ctx); err != nil {
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &links); err != nil {
 			Err(c, http.StatusInternalServerError, "listing upload links: "+err.Error())
 			return
 		}
-		Success(c, gin.H{"links": links})
+		PaginatedResponse(c, "links", links, total, p)
 	}
 }
 

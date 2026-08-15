@@ -53,6 +53,21 @@ func FileDownloadURL(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Record access for tiering.
+		_ = store.UpdateLastAccessedAt(ctx, tx, f.ID)
+		policy, _ := store.GetTieringPolicy(ctx, tx)
+		if policy != nil {
+			_ = store.TierUpOnAccess(ctx, tx, f.ID, policy)
+		}
+
+		// Dispatch webhook event.
+		go store.DispatchEvent(ctx, tx, db, c.GetString("org_slug"), "file.download", map[string]any{
+			"file_id": f.ID.String(),
+			"name": f.Name,
+			"size": f.Size,
+			"mime_type": f.MimeType,
+		})
+
 		Success(c, gin.H{
 			"url":      url,
 			"filename": f.Name,
@@ -403,6 +418,14 @@ func DeleteFile(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 		auditLog(ctx, tx, userID, "file_delete", "file", id.String(), map[string]any{"name": f.Name})
+
+		// Dispatch webhook event
+		go store.DispatchEvent(ctx, tx, db, c.GetString("org_slug"), "file.delete", map[string]any{
+			"file_id": id.String(),
+			"name":    f.Name,
+			"size":    f.Size,
+		})
+
 		Msg(c, "file deleted")
 	}
 }
@@ -494,6 +517,14 @@ func BatchMoveFiles(db *bun.DB) gin.HandlerFunc {
 		}
 
 		auditLog(ctx, tx, userID, "file_move_batch", "file", "", map[string]any{"count": len(req.IDs)})
+
+		// Dispatch webhook event for batch move
+		go store.DispatchEvent(ctx, tx, db, c.GetString("org_slug"), "file.move", map[string]any{
+			"count":   len(req.IDs),
+			"file_ids": req.IDs,
+			"folder_id": req.FolderID,
+		})
+
 		Success(c, gin.H{"moved": len(req.IDs)})
 	}
 }
@@ -551,6 +582,13 @@ func BatchDeleteFiles(db *bun.DB) gin.HandlerFunc {
 		}
 
 		auditLog(ctx, tx, userID, "file_delete_batch", "file", "", map[string]any{"count": deleted})
+
+		// Dispatch webhook event for batch delete
+		go store.DispatchEvent(ctx, tx, db, c.GetString("org_slug"), "file.delete", map[string]any{
+			"count":   deleted,
+			"file_ids": req.IDs,
+		})
+
 		Success(c, gin.H{"deleted": deleted})
 	}
 }

@@ -11,6 +11,9 @@ export interface FileListData {
 
 export interface FolderListData {
   folders: Folder[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 export interface BreadcrumbsData {
@@ -23,6 +26,9 @@ export interface DownloadUrlData {
 
 export interface TagsData {
   tags: Tag[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 export interface SearchResultsData {
@@ -102,4 +108,5 @@ export interface ItemActions {
   onRename: (item: ItemField) => void
   onMove: (item: ItemField) => void
   onDelete: (item: ItemField) => void
+  onDeleteWithFiles?: (item: ItemField) => void
 }

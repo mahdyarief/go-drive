@@ -26,6 +26,8 @@ type File struct {
 	Checksum        string     `json:"checksum" bun:"checksum"`
 	S3Key           string     `json:"s3_key" bun:"s3_key"`
 	ReplacesFileID  *uuid.UUID `json:"replaces_file_id" bun:"replaces_file_id,type:uuid"`
+	StorageTier     string     `json:"storage_tier" bun:"storage_tier,notnull,default:'standard'"`
+	LastAccessedAt  *time.Time `json:"last_accessed_at" bun:"last_accessed_at"`
 	CreatedAt       time.Time  `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
 	UpdatedAt       time.Time  `json:"updated_at" bun:"updated_at,nullzero,notnull,default:current_timestamp"`
 }

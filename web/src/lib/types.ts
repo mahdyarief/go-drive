@@ -120,6 +120,8 @@ export interface LockerFile {
   checksum: string
   s3_key: string
   replaces_file_id: string | null
+  storage_tier: string
+  last_accessed_at: string | null
   created_at: string
   updated_at: string
 }

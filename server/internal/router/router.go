@@ -67,7 +67,7 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 	}
 
 	// Tenant-scoped API routes (Bearer + tenant middleware)
-	tenant := r.Group("/api/t", middleware.Auth(db), middleware.Tenant(db))
+	tenant := r.Group("/api/t", middleware.Auth(db), middleware.Tenant(db), middleware.TenantRateLimit(120, time.Minute))
 	{
 		tenant.GET("/status", handler.TenantStatus())
 		tenant.POST("/upload", handler.UploadFile(db))
@@ -146,6 +146,18 @@ func New(auth *authula.Auth, db *bun.DB, staticFiles fs.FS) *gin.Engine {
 
 		// Audit log
 		tenant.GET("/audit-logs", handler.ListAuditLogs(db))
+
+		// Storage tiering
+		tenant.GET("/tiering/policy", handler.GetTieringPolicy(db))
+		tenant.PUT("/tiering/policy", handler.UpdateTieringPolicy(db))
+		tenant.POST("/tiering/run", handler.RunTiering(db))
+		tenant.POST("/files/:id/tier", handler.SetFileTier(db))
+
+		// Webhooks
+		tenant.GET("/webhooks", handler.ListWebhooks(db))
+		tenant.POST("/webhooks", handler.CreateWebhook(db))
+		tenant.DELETE("/webhooks/:id", handler.DeleteWebhook(db))
+		tenant.GET("/webhooks/:id/deliveries", handler.ListWebhookDeliveries(db))
 	}
 
 	// Admin API routes (Bearer + admin role required)

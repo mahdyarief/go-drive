@@ -21,11 +21,13 @@ func ListFolders(db *bun.DB) gin.HandlerFunc {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		ctx := c.Request.Context()
 
+		p := ParsePagination(c)
+
 		q := tx.NewSelect().Model((*model.Folder)(nil)).
 			Where("name NOT LIKE '.%'").
 			Order("name ASC")
-		if p := c.Query("parentId"); p != "" {
-			id, err := uuid.Parse(p)
+		if par := c.Query("parentId"); par != "" {
+			id, err := uuid.Parse(par)
 			if err != nil {
 				Err(c, http.StatusBadRequest, "invalid parentId")
 				return
@@ -35,12 +37,19 @@ func ListFolders(db *bun.DB) gin.HandlerFunc {
 			q.Where("parent_id IS NULL")
 		}
 
+		// Count total
+		total, err := q.Count(ctx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting folders: "+err.Error())
+			return
+		}
+
 		var folders []model.Folder
-		if err := q.Scan(ctx, &folders); err != nil {
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &folders); err != nil {
 			Err(c, http.StatusInternalServerError, "listing folders: "+err.Error())
 			return
 		}
-		Success(c, gin.H{"folders": folders})
+		PaginatedResponse(c, "folders", folders, total, p)
 	}
 }
 

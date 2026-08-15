@@ -30,9 +30,16 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		ctx := c.Request.Context()
+		p := ParsePagination(c)
 
+		q := tx.NewSelect().Model((*model.Store)(nil)).Order("created_at ASC")
+		total, err := q.Count(ctx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting stores: "+err.Error())
+			return
+		}
 		var stores []model.Store
-		if err := tx.NewSelect().Model(&stores).Order("created_at ASC").Scan(ctx); err != nil {
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &stores); err != nil {
 			Err(c, http.StatusInternalServerError, "listing stores: "+err.Error())
 			return
 		}
@@ -81,6 +88,9 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 		}
 		Success(c, gin.H{
 			"stores":             stores,
+			"total":              total,
+			"page":               p.Page,
+			"pageSize":           p.PageSize,
 			"primaryStoreId":     primaryID,
 			"storageMode":        storageMode,
 			"gdriveRedirectUri": config.BaseURL() + storeGDriveCallbackPath,

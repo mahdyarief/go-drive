@@ -17,12 +17,22 @@ func ListTags(db *bun.DB) gin.HandlerFunc {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		ctx := c.Request.Context()
 
+		p := ParsePagination(c)
+
+		q := tx.NewSelect().Model((*model.Tag)(nil)).Order("name ASC")
+
+		total, err := q.Count(ctx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting tags: "+err.Error())
+			return
+		}
+
 		var tags []model.Tag
-		if err := tx.NewSelect().Model(&tags).Order("name ASC").Scan(ctx); err != nil {
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &tags); err != nil {
 			Err(c, http.StatusInternalServerError, "listing tags: "+err.Error())
 			return
 		}
-		Success(c, gin.H{"tags": tags})
+		PaginatedResponse(c, "tags", tags, total, p)
 	}
 }
 

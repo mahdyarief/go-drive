@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"time"
@@ -23,12 +24,22 @@ func ListShareLinks(db *bun.DB) gin.HandlerFunc {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		ctx := c.Request.Context()
 
+		p := ParsePagination(c)
+
+		q := tx.NewSelect().Model((*model.ShareLink)(nil)).Order("created_at DESC")
+
+		total, err := q.Count(ctx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting share links: "+err.Error())
+			return
+		}
+
 		var links []model.ShareLink
-		if err := tx.NewSelect().Model(&links).Order("created_at DESC").Scan(ctx); err != nil {
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &links); err != nil {
 			Err(c, http.StatusInternalServerError, "listing share links: "+err.Error())
 			return
 		}
-		Success(c, gin.H{"links": links})
+		PaginatedResponse(c, "links", links, total, p)
 	}
 }
 
@@ -65,6 +76,29 @@ func CreateShareLink(db *bun.DB) gin.HandlerFunc {
 		} else if err := folderExists(ctx, tx, *req.FolderID); err != nil {
 			Err(c, http.StatusNotFound, "folder not found")
 			return
+		}
+
+		// Reuse an existing usable share link for the same target so that
+		// sharing the same file/folder twice returns the same URL.
+		{
+			var existing model.ShareLink
+			q := tx.NewSelect().Model(&existing).
+				Where("is_active = ?", true).
+				Where("(expires_at IS NULL OR expires_at > ?)", time.Now()).
+				Where("(max_downloads IS NULL OR download_count < max_downloads)").
+				Order("created_at ASC")
+			if req.FileID != nil {
+				q = q.Where("file_id = ?", *req.FileID)
+			} else {
+				q = q.Where("folder_id = ?", *req.FolderID)
+			}
+			if err := q.Limit(1).Scan(ctx); err == nil {
+				Success(c, gin.H{"link": existing})
+				return
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				Err(c, http.StatusInternalServerError, "looking up existing share link: "+err.Error())
+				return
+			}
 		}
 
 		access := req.Access
@@ -108,6 +142,15 @@ func CreateShareLink(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, "registering link token: "+err.Error())
 			return
 		}
+
+		// Dispatch webhook event for share creation
+		go store.DispatchEvent(ctx, tx, db, c.GetString("org_slug"), "share.create", map[string]any{
+			"link_id": link.ID.String(),
+			"file_id": link.FileID,
+			"folder_id": link.FolderID,
+			"access": link.Access,
+		})
+
 		Created(c, gin.H{"link": link})
 	}
 }
@@ -201,6 +244,14 @@ func DeleteShareLink(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 		_ = deleteLinkToken(ctx, db, link.Token)
+
+		// Dispatch webhook event for share deletion
+		go store.DispatchEvent(ctx, tx, db, c.GetString("org_slug"), "share.delete", map[string]any{
+			"link_id": link.ID.String(),
+			"file_id": link.FileID,
+			"folder_id": link.FolderID,
+		})
+
 		Msg(c, "share link deleted")
 	}
 }

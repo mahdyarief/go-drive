@@ -87,15 +87,15 @@ func LocalStoreBaseDir(slug string) string {
 }
 
 // SQLiteMaxOpenConns returns the max open connections for SQLite pools from
-// SQLITE_MAX_OPEN_CONNS or the default (1). Single connection serializes writes
-// to eliminate SQLITE_BUSY contention; reads still work via WAL concurrent readers.
+// SQLITE_MAX_OPEN_CONNS or the default (8). A pool of 8 allows concurrent reads
+// and parallel writes with busy_timeout absorbing contention.
 func SQLiteMaxOpenConns() int {
 	if v := os.Getenv("SQLITE_MAX_OPEN_CONNS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			return n
 		}
 	}
-	return 1
+	return 8
 }
 
 // NewDB creates a Bun database connection to the configured driver.

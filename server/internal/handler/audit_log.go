@@ -8,11 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/uptrace/bun"
 
+	"go-drive/server/internal/model"
 	"go-drive/server/internal/store"
 )
-
-// auditLogLimit caps how many audit entries are returned per request.
-const auditLogLimit = 100
 
 // ListAuditLogs returns the current user's recent audit entries (newest first).
 func ListAuditLogs(db *bun.DB) gin.HandlerFunc {
@@ -21,12 +19,24 @@ func ListAuditLogs(db *bun.DB) gin.HandlerFunc {
 		userID := c.GetString("user_id")
 		ctx := c.Request.Context()
 
-		logs, err := store.ListAuditLogs(ctx, tx, userID, auditLogLimit)
+		p := ParsePagination(c)
+
+		q := tx.NewSelect().Model((*model.AuditLog)(nil)).
+			Where("user_id = ?", userID).
+			Order("created_at DESC")
+
+		total, err := q.Count(ctx)
 		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting audit logs: "+err.Error())
+			return
+		}
+
+		var logs []model.AuditLog
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &logs); err != nil {
 			Err(c, http.StatusInternalServerError, "listing audit logs: "+err.Error())
 			return
 		}
-		Success(c, gin.H{"logs": logs})
+		PaginatedResponse(c, "logs", logs, total, p)
 	}
 }
 

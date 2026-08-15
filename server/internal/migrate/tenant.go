@@ -22,6 +22,7 @@ var sqliteDDL = strings.NewReplacer(
 	"uuid PRIMARY KEY DEFAULT gen_random_uuid()", "TEXT PRIMARY KEY",
 	"timestamptz", "datetime",
 	"DEFAULT now()", "DEFAULT CURRENT_TIMESTAMP",
+	"::jsonb", "",
 	"jsonb", "json",
 )
 
@@ -461,6 +462,46 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			created_at timestamptz NOT NULL DEFAULT now()
 		)`),
 		q(`CREATE INDEX IF NOT EXISTS %sfile_preview_tokens_expires_idx ON %sfile_preview_tokens (expires_at)`, prefix),
+
+		// Storage tiering policy (one row per tenant).
+		q(`CREATE TABLE IF NOT EXISTS %stiering_policies (
+			id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+			enabled boolean NOT NULL DEFAULT false,
+			tier_down_after_days integer NOT NULL DEFAULT 90,
+			tier_up_on_access boolean NOT NULL DEFAULT true,
+			default_tier text NOT NULL DEFAULT 'standard',
+			created_at timestamptz NOT NULL DEFAULT now(),
+			updated_at timestamptz NOT NULL DEFAULT now()
+		)`),
+
+		// Webhook subscriptions.
+		q(`CREATE TABLE IF NOT EXISTS %swebhooks (
+			id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id text NOT NULL,
+			name text NOT NULL,
+			target_url text NOT NULL,
+			secret text,
+			event_types jsonb NOT NULL DEFAULT '[]',
+			is_active boolean NOT NULL DEFAULT true,
+			last_triggered_at timestamptz,
+			created_at timestamptz NOT NULL DEFAULT now(),
+			updated_at timestamptz NOT NULL DEFAULT now()
+		)`),
+
+		// Webhook delivery attempts.
+		q(`CREATE TABLE IF NOT EXISTS %swebhook_deliveries (
+			id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+			webhook_id uuid NOT NULL REFERENCES %swebhooks(id) ON DELETE CASCADE,
+			event_type text NOT NULL,
+			payload text NOT NULL,
+			response_code integer,
+			response_body text,
+			success boolean NOT NULL DEFAULT false,
+			attempts integer NOT NULL DEFAULT 1,
+			last_attempt_at timestamptz NOT NULL DEFAULT now(),
+			created_at timestamptz NOT NULL DEFAULT now()
+		)`, prefix),
+		q(`CREATE INDEX IF NOT EXISTS %swebhook_deliveries_webhook_id_idx ON %swebhook_deliveries (webhook_id)`, prefix),
 	}
 
 	// Postgres additive alterations ride along in the same loop (ADD COLUMN
@@ -475,6 +516,9 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS provider_quota_limit bigint NOT NULL DEFAULT 0`),
 			q(`ALTER TABLE %sstores ADD COLUMN IF NOT EXISTS provider_quota_measured_at timestamptz`),
 			q(`ALTER TABLE %sworkspace_storage_settings ADD COLUMN IF NOT EXISTS storage_mode text NOT NULL DEFAULT 'cumulative'`),
+			q(`ALTER TABLE %sfiles ADD COLUMN IF NOT EXISTS storage_tier text NOT NULL DEFAULT 'standard'`),
+			q(`ALTER TABLE %sfiles ADD COLUMN IF NOT EXISTS last_accessed_at timestamptz`),
+			q(`CREATE INDEX IF NOT EXISTS %sfiles_last_accessed_at_idx ON %sfiles (last_accessed_at)`, prefix),
 		)
 	}
 
@@ -502,6 +546,12 @@ func CreateTenantTables(ctx context.Context, db bun.IDB, slug string) error {
 		}
 		if err := sqliteEnsureColumn(ctx, db, "workspace_storage_settings", "storage_mode", "storage_mode text NOT NULL DEFAULT 'cumulative'"); err != nil {
 			return fmt.Errorf("adding column to %s.workspace_storage_settings: %w", schema, err)
+		}
+		if err := sqliteEnsureColumn(ctx, db, "files", "storage_tier", "storage_tier text NOT NULL DEFAULT 'standard'"); err != nil {
+			return fmt.Errorf("adding column to %s.files: %w", schema, err)
+		}
+		if err := sqliteEnsureColumn(ctx, db, "files", "last_accessed_at", "last_accessed_at datetime"); err != nil {
+			return fmt.Errorf("adding column to %s.files: %w", schema, err)
 		}
 	}
 

@@ -30,16 +30,23 @@ func ListAPIKeys(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgSlug := c.GetString("org_slug")
 		ctx := c.Request.Context()
+		p := ParsePagination(c)
 
+		q := db.NewSelect().Model((*model.APIKey)(nil)).Where("org_slug = ?", orgSlug).Order("created_at DESC")
+		total, err := q.Count(ctx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting API keys: "+err.Error())
+			return
+		}
 		var keys []model.APIKey
-		if err := db.NewSelect().Model(&keys).Where("org_slug = ?", orgSlug).Order("created_at DESC").Scan(ctx); err != nil {
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &keys); err != nil {
 			Err(c, http.StatusInternalServerError, "listing API keys: "+err.Error())
 			return
 		}
 		for i := range keys {
 			keys[i].KeyHash = ""
 		}
-		Success(c, gin.H{"keys": keys})
+		PaginatedResponse(c, "keys", keys, total, p)
 	}
 }
 

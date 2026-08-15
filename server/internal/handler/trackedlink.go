@@ -24,12 +24,22 @@ func ListTrackedLinks(db *bun.DB) gin.HandlerFunc {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		ctx := c.Request.Context()
 
+		p := ParsePagination(c)
+
+		q := tx.NewSelect().Model((*model.TrackedLink)(nil)).Order("created_at DESC")
+
+		total, err := q.Count(ctx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting tracked links: "+err.Error())
+			return
+		}
+
 		var links []model.TrackedLink
-		if err := tx.NewSelect().Model(&links).Order("created_at DESC").Scan(ctx); err != nil {
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &links); err != nil {
 			Err(c, http.StatusInternalServerError, "listing tracked links: "+err.Error())
 			return
 		}
-		Success(c, gin.H{"links": links})
+		PaginatedResponse(c, "links", links, total, p)
 	}
 }
 
@@ -252,22 +262,27 @@ func ListTrackedLinkEvents(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		ctx := c.Request.Context()
+		p := ParsePagination(c)
 
 		id, err := uuid.Parse(c.Param("id"))
 		if err != nil {
 			Err(c, http.StatusBadRequest, "invalid tracked link id")
 			return
 		}
-		var events []model.TrackedLinkEvent
-		if err := tx.NewSelect().Model(&events).
+		q := tx.NewSelect().Model((*model.TrackedLinkEvent)(nil)).
 			Where("tracked_link_id = ?", id).
-			Order("timestamp DESC").
-			Limit(200).
-			Scan(ctx); err != nil {
+			Order("timestamp DESC")
+		total, err := q.Count(ctx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting events: "+err.Error())
+			return
+		}
+		var events []model.TrackedLinkEvent
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &events); err != nil {
 			Err(c, http.StatusInternalServerError, "listing events: "+err.Error())
 			return
 		}
-		Success(c, gin.H{"events": events})
+		PaginatedResponse(c, "events", events, total, p)
 	}
 }
 

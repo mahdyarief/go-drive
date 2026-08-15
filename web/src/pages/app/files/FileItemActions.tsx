@@ -61,6 +61,12 @@ export function FileItemActions({ item, actions }: FileItemActionsProps) {
           <FolderInput className="h-4 w-4 mr-2" />
           {t('files.move')}
         </DropdownMenuItem>
+        {item.isFolder && actions.onDeleteWithFiles && (
+          <DropdownMenuItem variant="destructive" onClick={() => actions.onDeleteWithFiles?.(item)}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            {t('files.deleteWithFiles')}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem variant="destructive" onClick={() => actions.onDelete(item)}>
           <Trash2 className="h-4 w-4 mr-2" />
           {t('files.delete')}

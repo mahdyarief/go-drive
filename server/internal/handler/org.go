@@ -92,13 +92,21 @@ func CreateOrg(db *bun.DB) gin.HandlerFunc {
 func ListOrgs(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("user_id")
+		p := ParsePagination(c)
+
+		q := db.NewSelect().
+			Model((*model.OrganizationMember)(nil)).
+			Relation("Organization").
+			Where("organization_member.user_id = ?", userID)
+
+		total, err := q.Count(c.Request.Context())
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting organizations: "+err.Error())
+			return
+		}
 
 		var members []model.OrganizationMember
-		err := db.NewSelect().
-			Model(&members).
-			Relation("Organization").
-			Where("organization_member.user_id = ?", userID).
-			Scan(c.Request.Context())
+		err = q.Limit(p.PageSize).Offset(p.Offset).Scan(c.Request.Context())
 		if err != nil {
 			Err(c, http.StatusInternalServerError, "failed to fetch organizations")
 			return
@@ -116,7 +124,7 @@ func ListOrgs(db *bun.DB) gin.HandlerFunc {
 			})
 		}
 
-		Success(c, gin.H{"organizations": orgs})
+		PaginatedResponse(c, "organizations", orgs, total, p)
 	}
 }
 
@@ -138,7 +146,8 @@ func GetOrg(db *bun.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Fetch all members of this org with display names/emails from users
+		// Fetch members of this org with display names/emails from users
+		p := ParsePagination(c)
 		type memberView struct {
 			ID     string `json:"id"`
 			UserID string `json:"user_id"`
@@ -147,13 +156,23 @@ func GetOrg(db *bun.DB) gin.HandlerFunc {
 			Role   string `json:"role"`
 		}
 		var memberList []memberView
+		countQ := db.NewRaw(`
+			SELECT COUNT(*) FROM organization_members WHERE organization_id = ?
+		`, member.OrganizationID)
+		var total int
+		err = countQ.Scan(c.Request.Context(), &total)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "failed to count members")
+			return
+		}
 		err = db.NewRaw(`
 			SELECT CAST(m.id AS TEXT) AS id, m.user_id, u.name, u.email, m.role
 			FROM organization_members m
 			LEFT JOIN users u ON CAST(u.id AS TEXT) = m.user_id
 			WHERE m.organization_id = ?
 			ORDER BY m.created_at ASC
-		`, member.OrganizationID).Scan(c.Request.Context(), &memberList)
+			LIMIT ? OFFSET ?
+		`, member.OrganizationID, p.PageSize, p.Offset).Scan(c.Request.Context(), &memberList)
 		if err != nil {
 			Err(c, http.StatusInternalServerError, "failed to fetch members")
 			return
@@ -170,6 +189,9 @@ func GetOrg(db *bun.DB) gin.HandlerFunc {
 				"quota_limit": quota,
 			},
 			"members":   memberList,
+			"total":     total,
+			"page":      p.Page,
+			"pageSize":  p.PageSize,
 			"your_role": member.Role,
 		})
 	}

@@ -58,6 +58,7 @@ export default function FilesPage() {
   const [moveTarget, setMoveTarget] = useState<ItemField | null>(null)
   const [moveFolderId, setMoveFolderId] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ItemField | null>(null)
+  const [deleteWithFilesTarget, setDeleteWithFilesTarget] = useState<ItemField | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [newFolderColor, setNewFolderColor] = useState<string>(FOLDER_COLORS[0])
@@ -176,6 +177,17 @@ export default function FilesPage() {
     onSuccess: () => {
       invalidate()
       setDeleteTarget(null)
+    },
+  })
+
+  const deleteWithFiles = useMutation({
+    mutationFn: (item: ItemField) =>
+      tenantApi<unknown>(`/api/t/folders/${item.id}?with_files=true`, orgSlug!, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      invalidate()
+      setDeleteWithFilesTarget(null)
     },
   })
 
@@ -313,6 +325,7 @@ export default function FilesPage() {
       setMoveFolderId('')
     },
     onDelete: (item) => setDeleteTarget(item),
+    onDeleteWithFiles: (item) => setDeleteWithFilesTarget(item),
   }
 
   const shareErrorMessage = createShareLink.isError
@@ -489,6 +502,10 @@ export default function FilesPage() {
         setDeleteTarget={setDeleteTarget}
         deleteItemPending={deleteItem.isPending}
         onDeleteSubmit={() => deleteTarget && deleteItem.mutate(deleteTarget)}
+        deleteWithFilesTarget={deleteWithFilesTarget}
+        setDeleteWithFilesTarget={setDeleteWithFilesTarget}
+        deleteWithFilesPending={deleteWithFiles.isPending}
+        onDeleteWithFilesSubmit={() => deleteWithFilesTarget && deleteWithFiles.mutate(deleteWithFilesTarget)}
         contextMenu={contextMenu}
         setContextMenu={setContextMenu}
         actions={actions}

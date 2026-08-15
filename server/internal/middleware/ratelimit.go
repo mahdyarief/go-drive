@@ -52,3 +52,44 @@ func RateLimit(limit int, window time.Duration) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// TenantRateLimit returns a middleware that applies rate limiting per tenant.
+// Uses tenant_id + user_id as the key to prevent noisy neighbors.
+func TenantRateLimit(limit int, window time.Duration) gin.HandlerFunc {
+	rl := &rateLimiter{
+		limit:    limit,
+		window:   window,
+		requests: make(map[string]*rateWindow),
+	}
+
+	return func(c *gin.Context) {
+		// Get tenant and user context
+		tenantID := c.GetString("tenant_id")
+		userID := c.GetString("user_id")
+
+		if tenantID == "" || userID == "" {
+			// Skip if not in tenant context
+			c.Next()
+			return
+		}
+
+		key := tenantID + ":" + userID
+		now := time.Now()
+
+		rl.mu.Lock()
+		entry, ok := rl.requests[key]
+		if !ok || now.Sub(entry.start) >= rl.window {
+			entry = &rateWindow{start: now}
+			rl.requests[key] = entry
+		}
+		entry.count++
+		over := entry.count > rl.limit
+		rl.mu.Unlock()
+
+		if over {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "tenant rate limit exceeded"})
+			return
+		}
+		c.Next()
+	}
+}

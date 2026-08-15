@@ -22,15 +22,23 @@ func ListS3Keys(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tx := c.MustGet("tenant_tx").(bun.Tx)
 		ctx := c.Request.Context()
+		p := ParsePagination(c)
+
+		q := tx.NewSelect().Model((*model.S3APIKey)(nil)).Order("created_at DESC")
+		total, err := q.Count(ctx)
+		if err != nil {
+			Err(c, http.StatusInternalServerError, "counting keys: "+err.Error())
+			return
+		}
 		var keys []model.S3APIKey
-		if err := tx.NewSelect().Model(&keys).Order("created_at DESC").Scan(ctx); err != nil {
+		if err := q.Limit(p.PageSize).Offset(p.Offset).Scan(ctx, &keys); err != nil {
 			Err(c, http.StatusInternalServerError, "listing keys: "+err.Error())
 			return
 		}
 		for i := range keys {
 			keys[i].EncryptedSecret = ""
 		}
-		Success(c, gin.H{"keys": keys})
+		PaginatedResponse(c, "keys", keys, total, p)
 	}
 }
 

@@ -71,6 +71,11 @@ interface FileDialogsProps {
   setDeleteTarget: (target: ItemField | null) => void
   deleteItemPending: boolean
   onDeleteSubmit: () => void
+  // Delete with files confirm
+  deleteWithFilesTarget: ItemField | null
+  setDeleteWithFilesTarget: (target: ItemField | null) => void
+  deleteWithFilesPending: boolean
+  onDeleteWithFilesSubmit: () => void
   // Right-click context menu
   contextMenu: { x: number; y: number; item: ItemField } | null
   setContextMenu: (menu: { x: number; y: number; item: ItemField } | null) => void
@@ -89,6 +94,7 @@ export function FileDialogs(props: FileDialogsProps) {
     allTags, createTagPending, onCreateTag, setFileTagsPending, onSaveTags,
     shareTarget, setShareTarget, copied, setCopied, shareUrl, sharePending, shareErrorMessage, onCopyShare,
     deleteTarget, setDeleteTarget, deleteItemPending, onDeleteSubmit,
+    deleteWithFilesTarget, setDeleteWithFilesTarget, deleteWithFilesPending, onDeleteWithFilesSubmit,
     contextMenu, setContextMenu, actions,
   } = props
 
@@ -253,7 +259,7 @@ export function FileDialogs(props: FileDialogsProps) {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('files.shareTitle')}</DialogTitle>
             <DialogDescription>{t('files.shareHint')}</DialogDescription>
@@ -267,8 +273,8 @@ export function FileDialogs(props: FileDialogsProps) {
             <p className="py-4 text-sm text-destructive">{shareErrorMessage}</p>
           ) : shareUrl ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
-                <span className="flex-1 truncate font-mono text-xs">{shareUrl}</span>
+              <div className="flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2">
+                <span className="min-w-0 flex-1 truncate font-mono text-xs">{shareUrl}</span>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -324,6 +330,25 @@ export function FileDialogs(props: FileDialogsProps) {
         </AlertDialogContent>
       </AlertDialog>
 
+
+      <AlertDialog open={!!deleteWithFilesTarget} onOpenChange={(o) => !o && setDeleteWithFilesTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('files.deleteWithFilesTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('files.deleteWithFilesConfirm')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteWithFilesTarget(null)}>
+              {t('links.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={deleteWithFilesPending} onClick={onDeleteWithFilesSubmit}>
+              {deleteWithFilesPending ? t('links.deleting') : t('files.deleteWithFiles')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {/* Right-click context menu */}
       {contextMenu && (
         <>
@@ -413,6 +438,19 @@ export function FileDialogs(props: FileDialogsProps) {
               <FolderInput className="h-4 w-4" />
               {t('files.move')}
             </button>
+            {contextMenu.item.isFolder && actions.onDeleteWithFiles && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-accent"
+                onClick={() => {
+                  actions.onDeleteWithFiles!(contextMenu.item)
+                  setContextMenu(null)
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+                {t('files.deleteWithFiles')}
+              </button>
+            )}
             <button
               type="button"
               className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-accent"
