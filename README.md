@@ -122,6 +122,46 @@ One binary, one port (`:8081`), serves API + frontend. No Nginx, no separate sta
 
 ---
 
+## Database: PostgreSQL or SQLite?
+
+go-drive supports two database backends — pick based on your scale:
+
+| | SQLite | PostgreSQL |
+|---|--------|------------|
+| Setup | Zero — a file on disk | Requires a Postgres 14+ instance |
+| Best for | Single server, small teams, self-hosting | Production, multi-instance, high traffic |
+| Concurrent users | Up to ~10–20 concurrent users | 100+ concurrent users |
+| Multi-tenancy | One `.db` file per tenant (`data/tenants/tenant_<slug>.db`) | Schema-per-tenant (`tenant_<slug>`) |
+| Scaling | Single-node only | Horizontal scaling, replicas, managed services |
+
+**Rule of thumb:**
+
+- **100+ concurrent users: use PostgreSQL.** SQLite serializes writes (one writer at a time, even in WAL mode) and will start hitting lock contention under heavy concurrent upload load.
+- **Up to ~10–20 concurrent users: SQLite is fine.** go-drive keeps transactions short (3-phase uploads, busy timeouts, connection pooling) so light concurrent workloads run smoothly on a single file — ideal for personal drives, small teams, and edge deployments (Fly.io volumes, VPS, Raspberry Pi).
+- **In between?** Start with SQLite and migrate to PostgreSQL when you feel the write contention. Metadata is portable; blob storage backends (S3/GDrive/local) are configured per-tenant and unaffected.
+
+### Using SQLite
+
+```env
+# server/.env
+DB_DRIVER=sqlite
+SQLITE_PATH=./data/app.db          # default
+SQLITE_MAX_OPEN_CONNS=8            # default; tune for your workload
+```
+
+SQLite runs in WAL mode with `busy_timeout=60s` and `synchronous=NORMAL` out of the box — commits skip fsync for speed while checkpoints stay durable.
+
+### Using PostgreSQL (default)
+
+```env
+# server/.env
+DATABASE_URL=postgres://user:password@host:5432/godrive
+```
+
+Works with Neon, Supabase, Fly Postgres, RDS, or any Postgres 14+ instance. The connection pool defaults to 25 open / 5 idle connections.
+
+---
+
 ## Using the S3 Gateway
 
 go-drive exposes an S3-compatible API at `/api/s3`. Any tool that speaks S3 can connect:
