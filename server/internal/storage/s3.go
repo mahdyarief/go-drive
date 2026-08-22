@@ -52,6 +52,16 @@ func NewS3(ctx context.Context, cfg Config) (*S3, error) {
 	}
 
 	clientOpts := []func(*s3.Options){}
+	// The SDK defaults to flexible checksums (RequestChecksumCalculation =
+	// WhenSupported), which re-encodes streaming uploads as aws-chunked
+	// payloads with an x-amz-decoded-content-length header and a trailing
+	// checksum. Many S3-compatible providers reject that framing
+	// ("Non-numeric value in header 'x-amz-decoded-content-length'"), so
+	// disable it and send plain requests instead.
+	clientOpts = append(clientOpts, func(o *s3.Options) {
+		o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+		o.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
+	})
 	if cfg.Endpoint != "" {
 		// Custom endpoints (MinIO, R2) use path-style addressing.
 		clientOpts = append(clientOpts, func(o *s3.Options) {
