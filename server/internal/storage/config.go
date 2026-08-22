@@ -4,7 +4,7 @@ package storage
 // provider. It is the Go equivalent of Locker's createStorageFromConfig:
 // the handler layer populates it from a stores row + decrypted store_secrets.
 type Config struct {
-	Provider  string // "local" | "s3" | "gdrive"
+	Provider  string // "local" | "s3" | "r2" | "b2" | "wasabi" | "spaces" | "hetzner" | "idrivee2" | "storj" | "gdrive"
 	BaseDir   string // local: root directory on disk
 	PublicURL string // local/s3: base URL for signed URLs (optional)
 

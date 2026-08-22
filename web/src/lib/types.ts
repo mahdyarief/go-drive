@@ -201,6 +201,7 @@ export interface Store {
   ingest_mode: string
   read_priority: number
   config: Record<string, unknown>
+  has_credentials?: boolean
   quota_used: number
   quota_limit: number
   provider_quota_limit: number

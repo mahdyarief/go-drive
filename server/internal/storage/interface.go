@@ -40,6 +40,9 @@ type Storage interface {
 	List(ctx context.Context, prefix string) ([]Object, error)
 	// Quota returns used/limit bytes for the backend (0,0 = unknown).
 	Quota(ctx context.Context) (used, limit int64, err error)
+	// Ping verifies the backend is reachable and the credentials are valid.
+	// It is what the stores UI's connection test uses.
+	Ping(ctx context.Context) error
 }
 
 // ErrNotSupported is returned when a provider cannot perform an operation.

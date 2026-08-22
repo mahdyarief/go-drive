@@ -32,7 +32,7 @@ Instead of choosing one storage provider, go-drive lets you:
 ## Key Features
 
 ### Storage
-- **Multi-backend** — S3-compatible (AWS, R2, MinIO, Backblaze B2), Google Drive, local filesystem
+- **Multi-backend** — S3-compatible (AWS, R2, Wasabi, Backblaze B2, DigitalOcean Spaces, Hetzner Object Storage, IDrive e2, Storj), Google Drive, local filesystem
 - **Routing policies** — send uploads to specific backends based on rules (size, type, cost tier)
 - **Storage tiering** — automatically move files between hot and cold backends based on age/access
 - **Quota management** — per-organization storage limits with enforcement

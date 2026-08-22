@@ -43,6 +43,25 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusInternalServerError, "listing stores: "+err.Error())
 			return
 		}
+		// Mark which stores have stored credentials (store_secrets row exists)
+		// so the edit dialog can show a "credentials saved" indicator without
+		// ever exposing the encrypted values.
+		if len(stores) > 0 {
+			ids := make([]uuid.UUID, 0, len(stores))
+			for _, s := range stores {
+				ids = append(ids, s.ID)
+			}
+			var secrets []model.StoreSecret
+			if err := tx.NewSelect().Model(&secrets).Where("store_id IN (?)", bun.In(ids)).Scan(ctx); err == nil {
+				has := make(map[uuid.UUID]bool, len(secrets))
+				for _, sec := range secrets {
+					has[sec.StoreID] = true
+				}
+				for i := range stores {
+					stores[i].HasCredentials = has[stores[i].ID]
+				}
+			}
+		}
 		// Backfill quota for GDrive stores whose provider quota was never
 		// measured or is older than the refresh interval, so the quota bar
 		// shows live provider data without a manual Test Connection. A nil
@@ -60,10 +79,15 @@ func ListStores(db *bun.DB) gin.HandlerFunc {
 			}
 			st, err := store.BuildStorage(ctx, tx, s)
 			if err != nil {
+				markStoreError(ctx, tx, s, "building storage: "+err.Error())
 				continue
 			}
 			used, limit, err := st.Quota(ctx)
-			if err != nil || limit == 0 {
+			if err != nil {
+				markStoreError(ctx, tx, s, "quota check: "+err.Error())
+				continue
+			}
+			if limit == 0 {
 				continue
 			}
 			now := time.Now()
@@ -193,7 +217,7 @@ func CreateStore(db *bun.DB) gin.HandlerFunc {
 			Err(c, http.StatusBadRequest, "connection test failed: "+err.Error())
 			return
 		}
-		if _, _, err := st.Quota(ctx); err != nil {
+		if err := st.Ping(ctx); err != nil {
 			Err(c, http.StatusBadRequest, "connection test failed: "+err.Error())
 			return
 		}
@@ -323,6 +347,19 @@ func DeleteStore(db *bun.DB) gin.HandlerFunc {
 	}
 }
 
+// markStoreError flips a store's status to "error" so the UI no longer shows
+// a stale "Connected" badge when a live provider check fails.
+func markStoreError(ctx context.Context, tx bun.Tx, s *model.Store, msg string) {
+	now := time.Now()
+	if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
+		Where("id = ?", s.ID).
+		Set("status = ?, last_tested_at = ?, updated_at = ?", "error", now, now).
+		Exec(ctx); err != nil {
+		return
+	}
+	s.Status = "error"
+}
+
 // TestStore verifies connectivity and returns quota.
 func TestStore(db *bun.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -341,17 +378,24 @@ func TestStore(db *bun.DB) gin.HandlerFunc {
 		}
 		st, err := store.BuildStorage(ctx, tx, &s)
 		if err != nil {
+			markStoreError(ctx, tx, &s, "building storage: "+err.Error())
 			Err(c, http.StatusInternalServerError, "building storage: "+err.Error())
+			return
+		}
+		if err := st.Ping(ctx); err != nil {
+			markStoreError(ctx, tx, &s, "connection test: "+err.Error())
+			Err(c, http.StatusBadRequest, "connection test failed: "+err.Error())
 			return
 		}
 		used, limit, err := st.Quota(ctx)
 		if err != nil {
+			markStoreError(ctx, tx, &s, "quota check: "+err.Error())
 			Err(c, http.StatusBadRequest, "connection test failed: "+err.Error())
 			return
 		}
 		now := time.Now()
 		if _, err := tx.NewUpdate().Model((*model.Store)(nil)).
-			Set("last_tested_at = ?, updated_at = ?", now, now).
+			Set("status = ?, last_tested_at = ?, updated_at = ?", "active", now, now).
 			Set("quota_used = ?, provider_quota_limit = ?", used, limit).
 			Set("provider_quota_measured_at = ?", now).
 			Where("id = ?", id).

@@ -40,6 +40,12 @@ export function providerLabel(t: (key: string) => string, provider: string): str
   if (provider === 'local') return t('stores.providerLocal')
   if (provider === 's3') return t('stores.providerS3')
   if (provider === 'gdrive') return t('stores.providerGdrive')
+  if (provider === 'b2') return t('stores.providerB2')
+  if (provider === 'wasabi') return t('stores.providerWasabi')
+  if (provider === 'spaces') return t('stores.providerSpaces')
+  if (provider === 'hetzner') return t('stores.providerHetzner')
+  if (provider === 'idrivee2') return t('stores.providerIdrivee2')
+  if (provider === 'storj') return t('stores.providerStorj')
   return provider
 }
 
@@ -48,6 +54,12 @@ export function providerLabel(t: (key: string) => string, provider: string): str
 export const PROVIDER_ICONS = {
   gdrive: Cloud,
   s3: Database,
+  b2: Database,
+  wasabi: Database,
+  spaces: Database,
+  hetzner: Database,
+  idrivee2: Database,
+  storj: Database,
   local: HardDrive,
 } as const
 
@@ -86,7 +98,7 @@ export interface CreateKeyData {
   secretAccessKey: string
 }
 
-export type Provider = 'local' | 's3' | 'gdrive'
+export type Provider = 'local' | 's3' | 'gdrive' | 'b2' | 'wasabi' | 'spaces' | 'hetzner' | 'idrivee2' | 'storj'
 
 export type WriteMode = 'write' | 'writeonly' | 'none'
 

@@ -20,7 +20,7 @@ func New(ctx context.Context, cfg Config) (Storage, error) {
 			dir = "./data/blobs"
 		}
 		return NewLocal(dir, deriveSignKey(), cfg.PublicURL)
-	case "s3", "r2":
+	case "s3", "r2", "b2", "wasabi", "spaces", "hetzner", "idrivee2", "storj":
 		return NewS3(ctx, cfg)
 	case "gdrive":
 		return NewGDrive(cfg.ClientID, cfg.ClientSecret, cfg.RefreshToken, cfg.FolderID)

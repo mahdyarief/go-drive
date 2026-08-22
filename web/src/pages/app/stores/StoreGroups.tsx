@@ -22,7 +22,7 @@ interface StoreGroupsProps {
   onDelete: (store: Store) => void
 }
 
-const PROVIDER_ORDER = ['gdrive', 's3', 'local'] as const
+const PROVIDER_ORDER = ['gdrive', 's3', 'b2', 'wasabi', 'spaces', 'hetzner', 'idrivee2', 'storj', 'local'] as const
 
 // StoreGroups clusters stores by provider (gdrive / s3 / local) so pages with
 // many storages stay navigable. Each group header shows the provider label and

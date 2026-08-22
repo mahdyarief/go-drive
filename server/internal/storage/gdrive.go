@@ -146,3 +146,9 @@ func (g *GDrive) Quota(ctx context.Context) (int64, int64, error) {
 	}
 	return q.UsageInDrive, q.Limit, nil
 }
+
+// Ping verifies the Drive account by querying the live About endpoint.
+func (g *GDrive) Ping(ctx context.Context) error {
+	_, _, err := g.Quota(ctx)
+	return err
+}

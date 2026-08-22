@@ -209,6 +209,18 @@ func (l *Local) Quota(ctx context.Context) (int64, int64, error) {
 	return used, 0, nil
 }
 
+// Ping verifies the base dir still exists and is a directory.
+func (l *Local) Ping(ctx context.Context) error {
+	info, err := os.Stat(l.baseDir)
+	if err != nil {
+		return fmt.Errorf("local: ping: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("local: ping: base dir is not a directory: %s", l.baseDir)
+	}
+	return nil
+}
+
 // SignKey exposes the HMAC key for the serve handler (read-only copy).
 func (l *Local) SignKey() []byte {
 	return append([]byte(nil), l.signKey...)

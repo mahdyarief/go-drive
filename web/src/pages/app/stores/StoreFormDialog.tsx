@@ -22,6 +22,13 @@ import { ExternalLink, HelpCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { IngestMode, Provider, StoreForm, WriteMode } from './stores'
 
+// S3_COMPATIBLE_PROVIDERS lists every provider alias that shares the S3
+// bucket/region/endpoint + accessKeyId/secretAccessKey form fields. Adding a
+// new S3-compatible backend only requires appending its alias here.
+const S3_COMPATIBLE_PROVIDERS: ReadonlySet<Provider> = new Set([
+  's3', 'b2', 'wasabi', 'spaces', 'hetzner', 'idrivee2', 'storj',
+])
+
 interface StoreFormDialogProps {
   orgSlug: string | undefined
   createOpen: boolean
@@ -60,6 +67,11 @@ export function StoreFormDialog(props: StoreFormDialogProps) {
     setForm({ ...form, credentials: { ...form.credentials, [key]: value } })
   }
 
+  // When editing a store that already has encrypted credentials persisted,
+  // show them as "saved" (masked) and keep existing values unless replaced.
+  const credentialsSaved = !!editTarget?.has_credentials
+  const hasNewCredentials = Object.values(form.credentials).some((v) => String(v ?? '').trim() !== '')
+
   const createStore = () =>
     tenantApi<{ store: Store }>('/api/t/stores', orgSlug!, {
       method: 'POST',
@@ -86,6 +98,9 @@ export function StoreFormDialog(props: StoreFormDialogProps) {
         readPriority: form.readPriority,
         quotaLimit: form.quotaLimit > 0 ? Math.round(form.quotaLimit * 1024 ** 3) : 0,
         config: form.config,
+        // Only overwrite stored credentials when the user actually typed new
+        // values; an empty object would wipe the saved secrets.
+        ...(hasNewCredentials ? { credentials: form.credentials } : {}),
       }),
     })
 
@@ -142,7 +157,7 @@ export function StoreFormDialog(props: StoreFormDialogProps) {
           if (!open) setEditTarget(null)
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editTarget ? t('stores.editStore') : t('stores.createStore')}</DialogTitle>
             <DialogDescription>
@@ -164,6 +179,12 @@ export function StoreFormDialog(props: StoreFormDialogProps) {
                   <SelectContent>
                     <SelectItem value="local">{t('stores.providerLocal')}</SelectItem>
                     <SelectItem value="s3">{t('stores.providerS3')}</SelectItem>
+                    <SelectItem value="b2">{t('stores.providerB2')}</SelectItem>
+                    <SelectItem value="wasabi">{t('stores.providerWasabi')}</SelectItem>
+                    <SelectItem value="spaces">{t('stores.providerSpaces')}</SelectItem>
+                    <SelectItem value="hetzner">{t('stores.providerHetzner')}</SelectItem>
+                    <SelectItem value="idrivee2">{t('stores.providerIdrivee2')}</SelectItem>
+                    <SelectItem value="storj">{t('stores.providerStorj')}</SelectItem>
                     <SelectItem value="gdrive">{t('stores.providerGdrive')}</SelectItem>
                   </SelectContent>
                 </Select>
@@ -174,38 +195,41 @@ export function StoreFormDialog(props: StoreFormDialogProps) {
               <Label>{t('stores.configSection')}</Label>
               {form.provider === 'local' && (
                 <>
-                  <Input placeholder={t('stores.baseDirPlaceholder')} onChange={(e) => setConfigField('baseDir', e.target.value)} />
-                  <Input placeholder={t('stores.publicUrlPlaceholder')} onChange={(e) => setConfigField('publicUrl', e.target.value)} />
+                  <Input placeholder={t('stores.baseDirPlaceholder')} value={form.config.baseDir ?? ''} onChange={(e) => setConfigField('baseDir', e.target.value)} />
+                  <Input placeholder={t('stores.publicUrlPlaceholder')} value={form.config.publicUrl ?? ''} onChange={(e) => setConfigField('publicUrl', e.target.value)} />
                   <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => setShowLocalHelp(true)}>
                     <HelpCircle className="h-3.5 w-3.5 mr-1" />
                     {t('stores.localHelpTrigger')}
                   </Button>
                 </>
               )}
-              {form.provider === 's3' && (
+              {S3_COMPATIBLE_PROVIDERS.has(form.provider) && (
                 <>
-                  <Input placeholder={t('stores.bucketPlaceholder')} onChange={(e) => setConfigField('bucket', e.target.value)} />
-                  <Input placeholder={t('stores.regionPlaceholder')} onChange={(e) => setConfigField('region', e.target.value)} />
-                  <Input placeholder={t('stores.endpointPlaceholder')} onChange={(e) => setConfigField('endpoint', e.target.value)} />
+                  <Input placeholder={t('stores.bucketPlaceholder')} value={form.config.bucket ?? ''} onChange={(e) => setConfigField('bucket', e.target.value)} />
+                  <Input placeholder={t('stores.regionPlaceholder')} value={form.config.region ?? ''} onChange={(e) => setConfigField('region', e.target.value)} />
+                  <Input placeholder={t('stores.endpointPlaceholder')} value={form.config.endpoint ?? ''} onChange={(e) => setConfigField('endpoint', e.target.value)} />
                 </>
               )}
               {form.provider === 'gdrive' && (
-                <Input placeholder={t('stores.folderIdPlaceholder')} onChange={(e) => setConfigField('folderId', e.target.value)} />
+                <Input placeholder={t('stores.folderIdPlaceholder')} value={form.config.folderId ?? ''} onChange={(e) => setConfigField('folderId', e.target.value)} />
               )}
             </div>
 
             <div className="space-y-2">
               <Label>{t('stores.credentialsSection')}</Label>
-              {form.provider === 's3' && (
+              {credentialsSaved && (
+                <p className="text-xs text-muted-foreground">{t('stores.credentialsSaved')}</p>
+              )}
+              {S3_COMPATIBLE_PROVIDERS.has(form.provider) && (
                 <>
-                  <Input placeholder={t('stores.accessKeyId')} onChange={(e) => setCredentialField('accessKeyId', e.target.value)} />
-                  <Input type="password" placeholder={t('stores.secretAccessKey')} onChange={(e) => setCredentialField('secretAccessKey', e.target.value)} />
+                  <Input placeholder={credentialsSaved ? t('stores.credentialsSavedMask') : t('stores.accessKeyId')} value={form.credentials.accessKeyId ?? ''} onChange={(e) => setCredentialField('accessKeyId', e.target.value)} />
+                  <Input type="password" placeholder={credentialsSaved ? t('stores.credentialsSavedMask') : t('stores.secretAccessKey')} value={form.credentials.secretAccessKey ?? ''} onChange={(e) => setCredentialField('secretAccessKey', e.target.value)} />
                 </>
               )}
               {form.provider === 'gdrive' && (
                 <>
-                  <Input placeholder={t('stores.clientId')} onChange={(e) => setCredentialField('clientId', e.target.value)} />
-                  <Input type="password" placeholder={t('stores.clientSecret')} onChange={(e) => setCredentialField('clientSecret', e.target.value)} />
+                  <Input placeholder={credentialsSaved ? t('stores.credentialsSavedMask') : t('stores.clientId')} value={form.credentials.clientId ?? ''} onChange={(e) => setCredentialField('clientId', e.target.value)} />
+                  <Input type="password" placeholder={credentialsSaved ? t('stores.credentialsSavedMask') : t('stores.clientSecret')} value={form.credentials.clientSecret ?? ''} onChange={(e) => setCredentialField('clientSecret', e.target.value)} />
                   <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => setShowGdriveHelp(true)}>
                     <HelpCircle className="h-3.5 w-3.5 mr-1" />
                     {t('stores.gdriveHelpTrigger')}

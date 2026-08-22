@@ -43,7 +43,7 @@ func NewS3(ctx context.Context, cfg Config) (*S3, error) {
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, "")),
 	}
 	if cfg.Endpoint != "" {
-		opts = append(opts, awsconfig.WithBaseEndpoint(cfg.Endpoint))
+		opts = append(opts, awsconfig.WithBaseEndpoint(normalizeEndpoint(cfg.Endpoint)))
 	}
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
@@ -189,6 +189,29 @@ func (s *S3) List(ctx context.Context, prefix string) ([]Object, error) {
 // Quota reports 0/0 for S3 (usage not available without extra API calls).
 func (s *S3) Quota(ctx context.Context) (int64, int64, error) {
 	return 0, 0, nil
+}
+
+// Ping verifies bucket and credentials via the S3 HeadBucket API, so a
+// wrong bucket name (e.g. a typo in the stores form) fails the connection
+// test instead of passing silently.
+func (s *S3) Ping(ctx context.Context) error {
+	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{
+		Bucket: aws.String(s.bucket),
+	})
+	if err != nil {
+		return fmt.Errorf("s3: ping: %w", err)
+	}
+	return nil
+}
+
+// normalizeEndpoint ensures an endpoint has a scheme. AWS SDK requires
+// endpoints to include http:// or https://, but users often enter bare
+// hostnames like "s3.us-east-005.backblazeb2.com".
+func normalizeEndpoint(endpoint string) string {
+	if !strings.Contains(endpoint, "://") {
+		return "https://" + endpoint
+	}
+	return endpoint
 }
 
 // errAs is a small helper so we can avoid importing errors in this file

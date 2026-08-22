@@ -312,7 +312,17 @@ func storeFits(s *model.Store, size int64) bool {
 // CreatePendingFileUpload inserts a file_blobs + files row pair in the
 // "uploading" state and returns both records. objectKey is the display path
 // (e.g. docs/reports/q1.pdf) that becomes the blob's storage key.
+//
+// Uploads overwrite: any existing blob at objectKey (left by an ingested
+// object or an interrupted upload) is dropped first so the UNIQUE object_key
+// constraint doesn't reject the re-upload. Callers that overwrite the object
+// in storage afterwards (GDrive creates a new file ID per upload) should
+// physically delete the old object themselves.
 func CreatePendingFileUpload(ctx context.Context, tx bun.IDB, userID string, folderID *uuid.UUID, name, objectKey, mime string, size int64) (*model.FileBlob, *model.File, error) {
+	if err := DeleteBlobEverywhere(ctx, tx, objectKey); err != nil {
+		return nil, nil, err
+	}
+
 	blob := &model.FileBlob{
 		ID:          uuid.New(),
 		CreatedByID: userID,
@@ -341,6 +351,32 @@ func CreatePendingFileUpload(ctx context.Context, tx bun.IDB, userID string, fol
 		return nil, nil, fmt.Errorf("store: inserting file: %w", err)
 	}
 	return blob, f, nil
+}
+
+// DeleteBlobEverywhere removes the file_blob row for objectKey plus every
+// files and blob_locations row that references it. It is a no-op when no
+// blob exists at the key. The caller owns the surrounding transaction.
+func DeleteBlobEverywhere(ctx context.Context, tx bun.IDB, objectKey string) error {
+	var existing model.FileBlob
+	err := tx.NewSelect().Model(&existing).Where("object_key = ?", objectKey).Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return fmt.Errorf("store: looking up existing blob: %w", err)
+	}
+	// files rows reference the blob; SQLite has no FK cascade, so remove
+	// dependents explicitly before the blob itself.
+	if _, err := tx.NewDelete().Model((*model.File)(nil)).Where("blob_id = ?", existing.ID).Exec(ctx); err != nil {
+		return fmt.Errorf("store: deleting files for blob: %w", err)
+	}
+	if _, err := tx.NewDelete().Model((*model.BlobLocation)(nil)).Where("blob_id = ?", existing.ID).Exec(ctx); err != nil {
+		return fmt.Errorf("store: deleting blob locations: %w", err)
+	}
+	if _, err := tx.NewDelete().Model((*model.FileBlob)(nil)).Where("id = ?", existing.ID).Exec(ctx); err != nil {
+		return fmt.Errorf("store: deleting blob: %w", err)
+	}
+	return nil
 }
 
 // MarkFileUploadReady flips file + blob to ready and records the primary

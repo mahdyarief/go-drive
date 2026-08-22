@@ -29,6 +29,9 @@ type Store struct {
 	LastSyncedAt     *time.Time     `json:"last_synced_at" bun:"last_synced_at"`
 	CreatedAt        time.Time      `json:"created_at" bun:"created_at,nullzero,notnull,default:current_timestamp"`
 	UpdatedAt        time.Time      `json:"updated_at" bun:"updated_at,nullzero,notnull,default:current_timestamp"`
+	// HasCredentials is computed at read time (store_secrets row exists) and
+	// is never persisted — credentials themselves stay encrypted server-side.
+	HasCredentials bool `json:"has_credentials" bun:"-"`
 }
 
 // StoreSecret holds the encrypted credentials for a Store (1:1).
