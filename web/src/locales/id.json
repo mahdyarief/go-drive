@@ -27,6 +27,12 @@
     "providerLocal": "Lokal",
     "providerS3": "S3",
     "providerGdrive": "Google Drive",
+    "providerB2": "Backblaze B2",
+    "providerWasabi": "Wasabi",
+    "providerSpaces": "DigitalOcean Spaces",
+    "providerHetzner": "Hetzner Object Storage",
+    "providerIdrivee2": "IDrive e2",
+    "providerStorj": "Storj",
     "baseDir": "Direktori Dasar",
     "baseDirPlaceholder": "mis. ./data/storage/my-org",
     "publicUrl": "URL Publik",
@@ -146,6 +152,14 @@
     "permissionReadonly": "Hanya-baca",
     "loadError": "Gagal memuat penyimpanan.",
     "actionError": "Aksi gagal. Silakan coba lagi.",
-    "credentialsSavedMask": "•••••••• (tersimpan)"
+    "credentialsSavedMask": "•••••••• (tersimpan)",
+    "photo": "Foto",
+    "video": "Video",
+    "document": "Dokumen",
+    "breakdownTitle": "Rincian penyimpanan",
+    "total": "Total",
+    "app.loading": "Memuat...",
+    "links.cancel": "Batal",
+    "links.save": "Simpan"
   }
 }

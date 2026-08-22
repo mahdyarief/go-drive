@@ -44,16 +44,16 @@ export function StorageBreakdownCard() {
   if (breakdownQuery.isError || !breakdownQuery.data) {
     return (
       <Card>
-        <CardContent className="py-8 text-sm text-destructive">{t('storage.loadError')}</CardContent>
+        <CardContent className="py-8 text-sm text-destructive">{t('stores.loadError')}</CardContent>
       </Card>
     )
   }
 
   const { photo, video, document: docs, total } = breakdownQuery.data.breakdown
   const segments: BreakdownSegment[] = [
-    { key: 'photo', label: t('storage.photo'), bytes: photo, className: 'bg-sky-500' },
-    { key: 'video', label: t('storage.video'), bytes: video, className: 'bg-violet-500' },
-    { key: 'document', label: t('storage.document'), bytes: docs, className: 'bg-emerald-500' },
+    { key: 'photo', label: t('stores.photo'), bytes: photo, className: 'bg-sky-500' },
+    { key: 'video', label: t('stores.video'), bytes: video, className: 'bg-violet-500' },
+    { key: 'document', label: t('stores.document'), bytes: docs, className: 'bg-emerald-500' },
   ]
 
   return (
@@ -61,7 +61,7 @@ export function StorageBreakdownCard() {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <PieChart className="h-4 w-4" />
-          {t('storage.breakdownTitle')}
+          {t('stores.breakdownTitle')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
@@ -83,7 +83,7 @@ export function StorageBreakdownCard() {
             </div>
           ))}
           <div className="flex items-center justify-between border-t pt-2">
-            <span className="text-muted-foreground">{t('storage.total')}</span>
+            <span className="text-muted-foreground">{t('stores.total')}</span>
             <span className="font-medium tabular-nums">{formatBytes(total)}</span>
           </div>
         </div>

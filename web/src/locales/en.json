@@ -152,6 +152,14 @@
     "permissionReadonly": "Read-only",
     "loadError": "Failed to load stores.",
     "actionError": "Action failed. Please try again.",
-    "credentialsSavedMask": "•••••••• (saved)"
+    "credentialsSavedMask": "•••••••• (saved)",
+    "photo": "Photos",
+    "video": "Videos",
+    "document": "Documents",
+    "breakdownTitle": "Storage breakdown",
+    "total": "Total",
+    "app.loading": "Loading...",
+    "links.cancel": "Cancel",
+    "links.save": "Save"
   }
 }
