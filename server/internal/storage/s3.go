@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -86,16 +87,53 @@ func (s *S3) key(path string) string {
 
 // Upload streams r to the given key.
 func (s *S3) Upload(ctx context.Context, path string, r io.Reader, contentType string) error {
+	// The gateway forwards streaming bodies that don't expose a length, and
+	// several S3-compatible backends reject chunked uploads with a 411
+	// MissingContentLength. Resolve an explicit ContentLength so the request
+	// is sent single-pass instead.
+	body, size := sizedBody(r)
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(s.bucket),
-		Key:         aws.String(s.key(path)),
-		Body:        r,
-		ContentType: aws.String(contentType),
+		Bucket:        aws.String(s.bucket),
+		Key:           aws.String(s.key(path)),
+		Body:          body,
+		ContentType:   aws.String(contentType),
+		ContentLength: size,
 	})
 	if err != nil {
 		return fmt.Errorf("s3: upload: %w", err)
 	}
 	return nil
+}
+
+// sizedBody returns r plus its length so PutObject can send an explicit
+// Content-Length. It prefers a known Len() (bytes.Reader/sizedReader), falls
+// back to seeking an io.ReadSeeker to the end, and finally buffers the stream
+// into memory when neither is available.
+func sizedBody(r io.Reader) (io.Reader, *int64) {
+	if lr, ok := r.(interface{ Len() int64 }); ok {
+		if n := lr.Len(); n > 0 {
+			return r, aws.Int64(n)
+		}
+	}
+	if lr, ok := r.(interface{ Len() int }); ok {
+		if n := int64(lr.Len()); n > 0 {
+			return r, aws.Int64(n)
+		}
+	}
+	if sr, ok := r.(io.ReadSeeker); ok {
+		end, err := sr.Seek(0, io.SeekEnd)
+		if err == nil && end > 0 {
+			if _, err := sr.Seek(0, io.SeekStart); err == nil {
+				return r, aws.Int64(end)
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		return r, nil
+	}
+	n := int64(buf.Len())
+	return bytes.NewReader(buf.Bytes()), &n
 }
 
 // Download fetches the object and returns its body + size.

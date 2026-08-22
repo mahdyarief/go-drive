@@ -393,11 +393,20 @@ func s3PutObject(c *gin.Context, db *bun.DB, key, userID string) {
 	// chunked framing before storing. Otherwise the raw chunk markers get
 	// persisted as part of the file content.
 	var bodyReader io.Reader = c.Request.Body
+	size := c.Request.ContentLength
 	if strings.Contains(strings.ToLower(c.GetHeader("Content-Encoding")), "aws-chunked") {
 		bodyReader = newAWSChunkedReader(c.Request.Body)
+		// The decoded size travels in this header; Content-Length holds the
+		// chunked framing length, which the storage backend must not see.
+		if dl, err := strconv.ParseInt(c.GetHeader("x-amz-decoded-content-length"), 10, 64); err == nil {
+			size = dl
+		}
 	}
 	h := md5.New()
-	body := io.TeeReader(bodyReader, h)
+	var body io.Reader = io.TeeReader(bodyReader, h)
+	if size > 0 {
+		body = &sizedReader{r: body, n: size}
+	}
 	if err := st.Upload(ctx, key, body, contentType); err != nil {
 		s3Err(c, http.StatusInternalServerError, "InternalError", err.Error())
 		return
@@ -760,6 +769,17 @@ type awsChunkedReader struct {
 	rem     int
 	done    bool
 }
+
+// sizedReader exposes a known length for a body whose size is known at the
+// gateway (e.g. from x-amz-decoded-content-length) so the storage backend can
+// send an explicit Content-Length instead of chunked transfer-encoding.
+type sizedReader struct {
+	r io.Reader
+	n int64
+}
+
+func (s *sizedReader) Read(p []byte) (int, error) { return s.r.Read(p) }
+func (s *sizedReader) Len() int64                 { return s.n }
 
 func newAWSChunkedReader(r io.Reader) *awsChunkedReader {
 	return &awsChunkedReader{r: r, buf: make([]byte, 32*1024)}
