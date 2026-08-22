@@ -157,9 +157,13 @@
     "video": "Videos",
     "document": "Documents",
     "breakdownTitle": "Storage breakdown",
-    "total": "Total",
-    "app.loading": "Loading...",
-    "links.cancel": "Cancel",
-    "links.save": "Save"
+    "total": "Total"
+  },
+  "app": {
+    "loading": "Loading..."
+  },
+  "links": {
+    "cancel": "Cancel",
+    "save": "Save"
   }
 }

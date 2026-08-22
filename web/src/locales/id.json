@@ -157,9 +157,13 @@
     "video": "Video",
     "document": "Dokumen",
     "breakdownTitle": "Rincian penyimpanan",
-    "total": "Total",
-    "app.loading": "Memuat...",
-    "links.cancel": "Batal",
-    "links.save": "Simpan"
+    "total": "Total"
+  },
+  "app": {
+    "loading": "Memuat..."
+  },
+  "links": {
+    "cancel": "Batal",
+    "save": "Simpan"
   }
 }
